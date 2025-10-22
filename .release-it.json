@@ -1,0 +1,28 @@
+{
+  "git": {
+    "commitMessage": "chore: release v${version}",
+    "tagName": "v${version}",
+    "requireCleanWorkingDir": true,
+    "requireUpstream": true,
+    "requireCommits": true
+  },
+  "github": {
+    "release": true,
+    "releaseName": "Release v${version}",
+    "releaseNotes": "See CHANGELOG.md for details"
+  },
+  "npm": {
+    "publish": false
+  },
+  "plugins": {
+    "@release-it/bumper": {
+      "in": ["package.json", "src-tauri/Cargo.toml", "src-tauri/tauri.conf.json"]
+    }
+  },
+  "hooks": {
+    "before:init": ["echo '🚀 Starting release process...'"],
+    "after:bump": ["echo '📦 Version bumped to ${version}'"],
+    "before:release": ["echo '🔨 Building application...'", "pnpm run build", "pnpm tauri build"],
+    "after:release": ["echo '✅ Release v${version} completed successfully!'"]
+  }
+}
