@@ -1,0 +1,399 @@
+/* Floating Bar Glassmorphism Styles */
+
+:root {
+  /* Floating bar specific colors */
+  --floating-bg-primary: rgba(255, 255, 255, 0.15);
+  --floating-bg-secondary: rgba(255, 255, 255, 0.08);
+  --floating-border: rgba(255, 255, 255, 0.2);
+  --floating-text: rgba(255, 255, 255, 0.9);
+  --floating-text-muted: rgba(255, 255, 255, 0.7);
+  
+  /* Neutral colors for animations */
+  --neutral-light: rgba(240, 240, 240, 0.8);
+  --neutral-medium: rgba(220, 220, 220, 0.8);
+  --neutral-dark: rgba(200, 200, 200, 0.8);
+  --accent-blue: rgba(200, 220, 255, 0.8);
+  
+  /* Blur effects */
+  --backdrop-blur: blur(20px);
+  --backdrop-blur-light: blur(10px);
+}
+
+/* Window transparency */
+html, body {
+  background: transparent !important;
+  margin: 0;
+  padding: 0;
+}
+
+/* Main container */
+.floating-bar-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 9999;
+  background: transparent;
+}
+
+/* Glassmorphism capsule */
+.floating-bar-capsule {
+  background: rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(30px);
+  -webkit-backdrop-filter: blur(30px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 12px;
+  height: 30px;
+  max-width: 260px;
+  pointer-events: auto;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transform: scale(1);
+  opacity: 1;
+  overflow: visible; /* Allow tooltips to show outside */
+  position: relative;
+}
+
+/* State containers */
+.floating-bar-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+
+.state-content {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  justify-content: center;
+}
+
+.state-text {
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Inter', sans-serif;
+  font-weight: 500;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.9);
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+  transition: all 0.3s ease;
+  white-space: nowrap;
+}
+
+/* Key styling */
+.key {
+  display: inline-block;
+  padding: 1px 4px;
+  background: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 500;
+  margin: 0 1px;
+  backdrop-filter: blur(10px);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+/* Error tooltip - only for errors, positioned outside the capsule */
+.error-tooltip {
+  position: absolute;
+  top: -40px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(220, 38, 38, 0.95);
+  color: white;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 500;
+  opacity: 0;
+  animation: error-tooltip-fade-in 0.3s ease forwards;
+  pointer-events: none;
+  z-index: 10000;
+  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.3);
+}
+
+@keyframes error-tooltip-fade-in {
+  to {
+    opacity: 1;
+  }
+}
+
+/* Waveform styles */
+.waveform-container {
+  display: flex;
+  align-items: center;
+  height: 16px;
+}
+
+.waveform-svg {
+  filter: drop-shadow(0 0 8px rgba(200, 200, 200, 0.3));
+}
+
+.waveform-bar {
+  fill: url(#waveform-gradient);
+  animation: waveform-pulse 0.6s ease-in-out infinite alternate;
+}
+
+@keyframes waveform-pulse {
+  0% {
+    opacity: 0.6;
+    transform: scaleY(0.8);
+  }
+  100% {
+    opacity: 1;
+    transform: scaleY(1);
+  }
+}
+
+/* SVG gradient for waveform */
+.waveform-svg defs {
+  background: linear-gradient(135deg, var(--neutral-light), var(--neutral-medium));
+}
+
+/* Loading dots */
+.loading-dots {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  height: 16px;
+}
+
+.dot {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--neutral-light), var(--accent-blue));
+  animation: dot-pulse 1.4s ease-in-out infinite;
+  box-shadow: 0 0 4px rgba(200, 200, 200, 0.4);
+}
+
+.dot:nth-child(1) { animation-delay: 0s; }
+.dot:nth-child(2) { animation-delay: 0.2s; }
+.dot:nth-child(3) { animation-delay: 0.4s; }
+.dot:nth-child(4) { animation-delay: 0.6s; }
+
+@keyframes dot-pulse {
+  0%, 80%, 100% {
+    opacity: 0.3;
+    transform: scale(0.8);
+  }
+  40% {
+    opacity: 1;
+    transform: scale(1.2);
+  }
+}
+
+/* State-specific styles with animations */
+.idle-state .floating-bar-capsule {
+  background: rgba(0, 0, 0, 0.25);
+  animation: idle-glow 3s ease-in-out infinite;
+  width: auto;
+  min-width: 200px;
+}
+
+.recording-state .floating-bar-capsule {
+  background: rgba(200, 200, 200, 0.4);
+  box-shadow: 
+    0 8px 32px rgba(200, 200, 200, 0.4),
+    0 2px 8px rgba(0, 0, 0, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  animation: recording-pulse 1.5s ease-in-out infinite;
+  width: auto;
+  min-width: 120px;
+}
+
+.processing-state .floating-bar-capsule {
+  background: rgba(180, 240, 255, 0.35);
+  backdrop-filter: blur(35px);
+  -webkit-backdrop-filter: blur(35px);
+  animation: processing-shimmer 2s ease-in-out infinite;
+  width: auto;
+  min-width: 120px;
+}
+
+.transcription-complete-state .floating-bar-capsule {
+  background: rgba(180, 255, 180, 0.4);
+  box-shadow: 
+    0 8px 32px rgba(180, 255, 180, 0.4),
+    0 2px 8px rgba(0, 0, 0, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  animation: transcription-success 0.5s ease-out;
+  width: auto;
+  min-width: 150px;
+  max-width: 260px;
+}
+
+.error-state .floating-bar-capsule {
+  background: rgba(220, 38, 38, 0.3);
+  box-shadow: 
+    0 8px 32px rgba(220, 38, 38, 0.3),
+    0 2px 8px rgba(0, 0, 0, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  animation: error-pulse 1s ease-in-out infinite;
+  width: auto;
+  min-width: 80px;
+}
+
+.error-icon {
+  font-size: 12px;
+  margin-right: 4px;
+}
+
+/* Animations */
+@keyframes idle-glow {
+  0%, 100% {
+    box-shadow: 
+      0 8px 32px rgba(0, 0, 0, 0.1),
+      0 2px 8px rgba(0, 0, 0, 0.05),
+      inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  }
+  50% {
+    box-shadow: 
+      0 8px 32px rgba(255, 255, 255, 0.1),
+      0 2px 8px rgba(0, 0, 0, 0.05),
+      inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  }
+}
+
+@keyframes recording-pulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 
+      0 8px 32px rgba(200, 200, 200, 0.3),
+      0 2px 8px rgba(0, 0, 0, 0.05),
+      inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  }
+  50% {
+    transform: scale(1.02);
+    box-shadow: 
+      0 12px 40px rgba(200, 200, 200, 0.4),
+      0 4px 12px rgba(0, 0, 0, 0.1),
+      inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  }
+}
+
+@keyframes processing-shimmer {
+  0%, 100% {
+    background: rgba(180, 240, 255, 0.12);
+  }
+  50% {
+    background: rgba(180, 240, 255, 0.18);
+  }
+}
+
+@keyframes transcription-success {
+  0% {
+    transform: scale(1);
+    opacity: 0.8;
+  }
+  50% {
+    transform: scale(1.05);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes error-pulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 
+      0 8px 32px rgba(220, 38, 38, 0.2),
+      0 2px 8px rgba(0, 0, 0, 0.05),
+      inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  }
+  50% {
+    transform: scale(1.02);
+    box-shadow: 
+      0 12px 40px rgba(220, 38, 38, 0.4),
+      0 4px 12px rgba(0, 0, 0, 0.1),
+      inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  }
+}
+
+/* Transcription result styles */
+.transcription-result {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  max-width: 100%;
+}
+
+.transcription-text {
+  font-size: 11px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.95);
+  text-align: center;
+  line-height: 1.2;
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.transcription-meta {
+  display: flex;
+  gap: 4px;
+  font-size: 9px;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.duration, .model {
+  background: rgba(255, 255, 255, 0.1);
+  padding: 1px 4px;
+  border-radius: 2px;
+  backdrop-filter: blur(5px);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .floating-bar-capsule {
+    width: 260px;
+    max-width: 260px;
+    height: 30px;
+    padding: 0 16px;
+  }
+  
+  .state-text {
+    font-size: 12px;
+  }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .floating-bar-capsule {
+    background: rgba(0, 0, 0, 0.8);
+    border: 2px solid rgba(255, 255, 255, 0.5);
+  }
+  
+  .state-text {
+    color: white;
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .waveform-bar,
+  .dot {
+    animation: none;
+  }
+  
+  .floating-bar-capsule {
+    transition: none;
+  }
+}
