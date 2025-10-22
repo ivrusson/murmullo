@@ -1,0 +1,119 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    - cron: '0 0 * * 1' # Weekly security scans
+
+jobs:
+  test-and-build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [macos-latest, ubuntu-latest, windows-latest]
+        node-version: ['18', '20']
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'pnpm'
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: latest
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Lint TypeScript
+        run: pnpm run lint || echo "Linting completed with warnings"
+
+      - name: Type check
+        run: pnpm run type-check || echo "Type checking completed with warnings"
+
+      - name: Build frontend
+        run: pnpm run build
+
+      - name: Test Rust code
+        run: cd src-tauri && cargo test
+
+      - name: Lint Rust code
+        run: cd src-tauri && cargo clippy -- -D warnings
+
+      - name: Format Rust code
+        run: cd src-tauri && cargo fmt --check
+
+      - name: Build Tauri app (debug)
+        run: pnpm tauri build --debug
+
+  security-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+
+      - name: Upload Trivy scan results
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+  dependency-review:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Dependency Review
+        uses: actions/dependency-review-action@v3
+
+  code-quality:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'pnpm'
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: latest
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Run Prettier check
+        run: pnpm exec prettier --check "src/**/*.{ts,tsx,js,jsx,json,css,md}"
+
+      - name: Run ESLint
+        run: pnpm run lint
+
+      - name: Type check
+        run: pnpm run type-check

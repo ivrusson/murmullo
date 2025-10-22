@@ -1,0 +1,144 @@
+name: Release Pipeline
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., 1.0.0)'
+        required: true
+        type: string
+      platform:
+        description: 'Platform to build for'
+        required: false
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - macos
+          - windows
+          - linux
+
+jobs:
+  build-and-release:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [macos-latest, ubuntu-latest, windows-latest]
+        include:
+          - os: macos-latest
+            platform: macos
+            arch: x64
+          - os: macos-latest
+            platform: macos
+            arch: aarch64
+          - os: ubuntu-latest
+            platform: linux
+            arch: x64
+          - os: windows-latest
+            platform: windows
+            arch: x64
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'pnpm'
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: latest
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Build frontend
+        run: pnpm run build
+
+      - name: Build Tauri app
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: 'Murmullo v__VERSION__'
+          releaseBody: 'See CHANGELOG.md for details'
+          releaseDraft: false
+          prerelease: false
+          args: '--config "{\\"bundle\\":{\\"identifier\\":\\"com.murmullo.app\\",\\"targets\\":\\"all\\"}}"'
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: murmullo-${{ matrix.platform }}-${{ matrix.arch }}
+          path: src-tauri/target/release/bundle/
+          retention-days: 30
+
+  create-release:
+    needs: build-and-release
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Murmullo ${{ github.ref_name }}
+          body: |
+            ## What's New in ${{ github.ref_name }}
+            
+            See [CHANGELOG.md](CHANGELOG.md) for detailed changes.
+            
+            ## Downloads
+            
+            ### macOS
+            - **Intel Macs**: `murmullo-macos-x64.dmg`
+            - **Apple Silicon**: `murmullo-macos-aarch64.dmg`
+            
+            ### Windows
+            - **x64**: `murmullo-windows-x64.msi`
+            
+            ### Linux
+            - **x64**: `murmullo-linux-x64.AppImage`
+            
+            ## Installation
+            
+            1. Download the appropriate file for your platform
+            2. Run the installer
+            3. Grant necessary permissions when prompted
+            4. Launch Murmullo and start dictating!
+            
+            ## System Requirements
+            
+            - **macOS**: 12.0 or later
+            - **Windows**: Windows 10 or later
+            - **Linux**: Ubuntu 18.04+ or equivalent
+            
+          files: |
+            artifacts/murmullo-macos-x64/src-tauri/target/release/bundle/dmg/*.dmg
+            artifacts/murmullo-macos-aarch64/src-tauri/target/release/bundle/dmg/*.dmg
+            artifacts/murmullo-windows-x64/src-tauri/target/release/bundle/msi/*.msi
+            artifacts/murmullo-linux-x64/src-tauri/target/release/bundle/appimage/*.AppImage
+          draft: false
+          prerelease: false
