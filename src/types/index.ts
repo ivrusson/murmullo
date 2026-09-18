@@ -1,3 +1,5 @@
+import type { ThemePreference } from '../lib/theme';
+
 export interface AudioDevice {
   id: string;
   name: string;
@@ -11,12 +13,15 @@ export interface ModelInfo {
   download_url?: string;
   description: string;
   languages: string[];
+  is_loaded?: boolean;
 }
 
 export interface TranscriptionResult {
   text: string;
+  raw_text?: string;
   duration_ms: number;
   model_used: string;
+  llm_used?: boolean;
 }
 
 export interface TranscriptionHistoryItem {
@@ -33,44 +38,27 @@ export interface AudioLevel {
   is_recording: boolean;
 }
 
-export interface WhisperConfig {
-  language?: string;
-  temperature: number;
-  beam_size: number;
-}
-
 export type InsertionMode = 'clipboard' | 'keystroke' | 'api';
 
-export interface AppSettings {
-  selectedModel: string;
-  selectedLanguage: string;
-  insertionMode: InsertionMode;
-  hotkey: string;
-  temperature: number;
-  beamSize: number;
-}
-
-// Configuration interfaces
 export interface HotkeyConfig {
-  enabled: boolean;
+  enabled?: boolean;
   toggle_recording: string;
   push_to_talk: string;
 }
 
 export interface AppConfig {
-  whisper: WhisperConfigApp;
+  runtime: RuntimeConfig;
   audio: AudioConfig;
-  vad: VadConfig;
   hotkeys: HotkeyConfig;
   ui: UiConfig;
 }
 
-export interface WhisperConfigApp {
-  temperature: number;
-  best_of: number;
+export interface RuntimeConfig {
+  stt_port: number;
+  llm_url: string;
+  llm_model: string;
+  llm_enabled: boolean;
   default_language?: string;
-  auto_detect: boolean;
-  initial_prompt: string;
 }
 
 export interface AudioConfig {
@@ -83,19 +71,48 @@ export interface AudioConfig {
   min_audio_length: number;
 }
 
-export interface VadConfig {
-  enabled: boolean;
-  sensitivity: number;
-  silence_timeout: number;
-  min_speech_duration: number;
-  pre_padding: number;
-  post_padding: number;
-}
-
 export interface UiConfig {
-  theme: string;
+  theme: ThemePreference;
   language: string;
   show_debug_info: boolean;
   auto_save_transcriptions: boolean;
   selected_model?: string;
+}
+
+export interface ComponentStatus {
+  state: string;
+  message: string;
+  progress: number | null;
+}
+
+export interface RuntimeStatus {
+  stt_binary: ComponentStatus;
+  stt_model: ComponentStatus;
+  stt_server: ComponentStatus;
+  llm_binary: ComponentStatus;
+  llm_server: ComponentStatus;
+  llm_model: string | null;
+  llm_model_status?: ComponentStatus;
+  dictation_ready: boolean;
+}
+
+export interface PipelineLogEntry {
+  ts: number;
+  stage: string;
+  message: string;
+}
+
+export interface DictionaryEntry {
+  id: string;
+  term: string;
+  replacement: string;
+  language?: string;
+  origin: string;
+  created_at: string;
+}
+
+export interface MacosPermissionStatus {
+  microphone: boolean;
+  accessibility: boolean;
+  input_monitoring: boolean;
 }

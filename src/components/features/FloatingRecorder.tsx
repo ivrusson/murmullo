@@ -2,31 +2,30 @@ import React, { useState, useEffect } from 'react';
 import { Mic, Square, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui';
 import { AudioBubble } from '../AudioBubble';
-import { audioService, modelService, transcriptionService } from '../../services/tauri';
-import { TranscriptionService } from '../../services/transcriptionService';
+import {
+  audioService,
+  runtimeService,
+  transcriptionService,
+} from '../../services/tauri';
 import { toast } from 'sonner';
-import { emit } from '@tauri-apps/api/event';
 import { useAppConfig } from '../../contexts/AppConfigContext';
 
-interface FloatingRecorderProps {
-  className?: string;
-}
-
-export const FloatingRecorder: React.FC<FloatingRecorderProps> = ({ className = '' }) => {
+export const FloatingRecorder: React.FC<{ className?: string }> = ({
+  className = '',
+}) => {
   const [isRecording, setIsRecording] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [audioLevel, setAudioLevel] = useState(0);
   const [recordingTime, setRecordingTime] = useState(0);
-  
-  const { selectedDevice, selectedModel, isLoading } = useAppConfig();
+  const { selectedDevice, isLoading, runtimeStatus } = useAppConfig();
 
-  // Recording timer
   useEffect(() => {
     let interval: number;
     if (isRecording) {
-      interval = setInterval(() => {
-        setRecordingTime(prev => prev + 1);
-      }, 1000);
+      interval = window.setInterval(
+        () => setRecordingTime(prev => prev + 1),
+        1000
+      );
     } else {
       setRecordingTime(0);
     }
@@ -34,40 +33,32 @@ export const FloatingRecorder: React.FC<FloatingRecorderProps> = ({ className = 
   }, [isRecording]);
 
   const handleStartRecording = async () => {
-    if (!selectedDevice || !selectedModel) {
-      toast.error('Please select a microphone and model first');
+    if (!selectedDevice) {
+      toast.error('Select a microphone first');
       return;
     }
-
+    const status = runtimeStatus ?? (await runtimeService.status());
+    if (!status.dictation_ready) {
+      toast.error('STT is not ready', {
+        description: 'Open Runtimes and start nemo-speech',
+      });
+      return;
+    }
     try {
       setIsRecording(true);
-
-      // Load model if not already loaded
-      const isLoaded = await modelService.isModelLoaded(selectedModel);
-      if (!isLoaded) {
-        await modelService.loadModel(selectedModel);
-      }
-
-      // Start recording
       await audioService.startRecording(selectedDevice);
-
-      toast.success('Recording started');
-
-      // Start audio level monitoring
-      const levelInterval = setInterval(async () => {
+      const levelInterval = window.setInterval(async () => {
         try {
           const level = await audioService.getAudioLevel();
           setAudioLevel(level.level);
-        } catch (error) {
-          console.error('Error getting audio level:', error);
+        } catch {
+          /* ignore */
         }
       }, 100);
-
-      // Store interval for cleanup
-      (window as any).audioLevelInterval = levelInterval;
-
+      (window as Window & { audioLevelInterval?: number }).audioLevelInterval =
+        levelInterval;
     } catch (error) {
-      console.error('Error starting recording:', error);
+      console.error(error);
       toast.error('Failed to start recording');
       setIsRecording(false);
     }
@@ -77,55 +68,19 @@ export const FloatingRecorder: React.FC<FloatingRecorderProps> = ({ className = 
     try {
       setIsRecording(false);
       setIsProcessing(true);
-
-      // Clear audio level monitoring
-      if ((window as any).audioLevelInterval) {
-        clearInterval((window as any).audioLevelInterval);
-        (window as any).audioLevelInterval = null;
+      const w = window as Window & { audioLevelInterval?: number };
+      if (w.audioLevelInterval) {
+        clearInterval(w.audioLevelInterval);
+        w.audioLevelInterval = undefined;
       }
-
-      // Stop recording and get audio data
       const audioData = await audioService.stopRecording();
-
       toast.info('Processing audio...');
-
-      // Transcribe audio
       const result = await transcriptionService.transcribeAudio(audioData);
-
-      // Save transcription with audio data to persistent storage
-      try {
-        const transcriptionId = await TranscriptionService.saveTranscription(
-          result.text,
-          audioData,
-          result.model_used,
-          undefined, // language - could be set from config
-          {
-            duration_seconds: (result.duration_ms / 1000).toString(),
-            recording_time: recordingTime.toString(),
-            device_used: selectedDevice,
-          }
-        );
-
-        console.log('✅ Transcription saved with ID:', transcriptionId);
-
-        // Emit event to refresh transcription history
-        emit('transcription-saved', {
-          id: transcriptionId,
-          text: result.text
-        });
-
-        toast.success('Transcription saved successfully');
-
-      } catch (saveError) {
-        console.error('❌ Failed to save transcription:', saveError);
-        toast.error('Transcription completed but failed to save');
-      }
-
+      toast.success(result.text);
       setIsProcessing(false);
-
     } catch (error) {
-      console.error('Error stopping recording:', error);
-      toast.error('Failed to process recording');
+      const message = error instanceof Error ? error.message : String(error);
+      toast.error(message || 'Failed to process recording');
       setIsProcessing(false);
     }
   };
@@ -136,26 +91,27 @@ export const FloatingRecorder: React.FC<FloatingRecorderProps> = ({ className = 
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  // Don't render if still loading configuration
   if (isLoading) {
     return null;
   }
 
   return (
-    <div className={`fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50 ${className}`}>
-      <div className={`bg-white border border-gray-200 rounded-xl shadow-lg transition-all duration-300 ${
-        isRecording ? 'px-6 py-4' : 'px-4 py-3'
-      }`}>
+    <div
+      className={`fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50 ${className}`}
+    >
+      <div
+        className={`bg-white border border-gray-200 rounded-xl shadow-lg ${isRecording ? 'px-6 py-4' : 'px-4 py-3'}`}
+      >
         {!isRecording ? (
           <Button
             onClick={handleStartRecording}
             disabled={isProcessing}
-            className="flex items-center gap-2 bg-primary hover:bg-primary/90 text-primary-foreground"
+            className="flex items-center gap-2"
           >
             {isProcessing ? (
               <>
                 <RefreshCw size={16} className="animate-spin" />
-                Loading...
+                Processing...
               </>
             ) : (
               <>

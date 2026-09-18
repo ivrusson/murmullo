@@ -1,207 +1,237 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { listen } from '@tauri-apps/api/event';
-import { Container, Section, Flex } from '@/components/layout';
-import { Badge } from '@/components/ui';
-import { Heading, Text } from '@/components/ui';
+import {
+  Copy,
+  Trash2,
+  Download,
+  ClipboardPaste,
+  SpellCheck,
+  Search,
+} from 'lucide-react';
+import { toast } from 'sonner';
 import { useTranscriptionHistory } from '../../hooks/useTranscriptionHistory';
-import { TranscriptionRecord } from '../../types/transcription';
-import { Copy, Trash2, Download } from 'lucide-react';
+import { insertionService, dictionaryService } from '../../services/tauri';
+import { useAppConfig } from '../../contexts/AppConfigContext';
+import { formatHotkey } from '../../lib/hotkey';
 
 export function TranscriptionsPage() {
+  const { config } = useAppConfig();
+  const ptt = formatHotkey(config?.hotkeys.push_to_talk);
   const {
     history,
     removeTranscription,
     copyToClipboard,
     downloadAudioFile,
-    refreshHistory
+    refreshHistory,
   } = useTranscriptionHistory();
+  const [query, setQuery] = useState('');
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  // Listen for new transcription events
   useEffect(() => {
-    console.log('🔧 Setting up transcription-saved listener for TranscriptionsPage...');
-    
-    const unlistenTranscriptionSaved = listen('transcription-saved', (event) => {
-      const payload = event.payload as { id: string; text: string };
-      console.log('📝 Transcription saved event received:', payload);
+    const unlisten = listen('transcription-saved', () => {
       refreshHistory();
     });
-
-    console.log('✅ Transcription-saved listener set up successfully');
-
     return () => {
-      console.log('🧹 Cleaning up transcription-saved listener');
-      unlistenTranscriptionSaved.then(unlistenFn => unlistenFn());
+      unlisten.then(fn => fn());
     };
   }, [refreshHistory]);
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return history;
+    return history.filter(item => item.text.toLowerCase().includes(q));
+  }, [history, query]);
+
+  const selected =
+    filtered.find(item => item.id === selectedId) ?? filtered[0] ?? null;
 
   const formatDuration = (ms: number) => {
     const seconds = Math.floor(ms / 1000);
     const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = seconds % 60;
-    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
-  };
-
-  const formatFileSize = (bytes: number) => {
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+    return `${minutes}:${(seconds % 60).toString().padStart(2, '0')}`;
   };
 
   const getTimeAgo = (timestamp: string) => {
-    const now = new Date();
-    const date = new Date(timestamp);
-    const diffMs = now.getTime() - date.getTime();
-    const diffMinutes = Math.floor(diffMs / (1000 * 60));
-    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-
-    if (diffMinutes < 60) {
-      return `${diffMinutes} min ago`;
-    } else if (diffHours < 24) {
-      return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
-    } else {
-      const diffDays = Math.floor(diffHours / 24);
-      return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
-    }
+    const diffMinutes = Math.floor(
+      (Date.now() - new Date(timestamp).getTime()) / 60000
+    );
+    if (diffMinutes < 60) return `${diffMinutes} min`;
+    const hours = Math.floor(diffMinutes / 60);
+    if (hours < 24) return `${hours} h`;
+    return `${Math.floor(hours / 24)} d`;
   };
 
-  const getPreviewText = (text: string) => {
-    return text.length > 80 ? text.substring(0, 80) + '...' : text;
-  };
-
-  const getTitleFromText = (text: string) => {
-    // Extract first sentence or first 40 characters as title
-    const firstSentence = text.split('.')[0];
-    if (firstSentence.length <= 40) {
-      return firstSentence;
-    }
-    return text.substring(0, 40) + '...';
-  };
-
-  const handleCopyToClipboard = async (text: string) => {
-    const success = await copyToClipboard(text);
-    if (success) {
-      console.log('Text copied to clipboard');
-    }
-  };
-
-  const handleDownloadAudio = async (item: TranscriptionRecord) => {
-    try {
-      // Create a filename based on the transcription
-      const timestamp = new Date(item.created_at).toISOString().split('T')[0];
-      const filename = `murmullo_${timestamp}_${item.id.substring(0, 8)}.wav`;
-
-      // Use the browser's download API
-      const audioPath = await downloadAudioFile(item.id, filename);
-      if (audioPath) {
-        console.log('Audio file downloaded:', filename);
-      }
-    } catch (error) {
-      console.error('Failed to download audio file:', error);
-    }
-  };
+  const words = history.reduce(
+    (sum, item) => sum + item.text.split(/\s+/).filter(Boolean).length,
+    0
+  );
+  const minutes = Math.round(
+    history.reduce((sum, item) => sum + item.duration_ms, 0) / 60000
+  );
 
   return (
-    <div className="min-h-full bg-background">
-      <Container size="lg" padding="sm">
-        <Section spacing="md">
-          {/* Header */}
-          <Flex direction="column" align="center" gap="sm" className="mb-6">
-            <Heading level={1} size="2xl" color="default" className="font-semibold">
-              Recent Transcriptions
-            </Heading>
-            <Text size="sm" color="muted" align="center" className="font-light">
-              Your latest voice recordings and transcriptions
-            </Text>
-          </Flex>
-
-          {/* Transcriptions List */}
-          {history.length === 0 ? (
-            <div className="text-center py-8">
-              <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mx-auto mb-3">
-                <svg className="w-6 h-6 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
-                </svg>
+    <div className="min-h-full px-6 py-6 space-y-5">
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h1 className="text-[28px] font-semibold tracking-tight">
+            Historial de Transcripciones
+          </h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Dictados, correcciones y audio local
+          </p>
+        </div>
+        <div className="flex gap-3">
+          {[
+            { label: 'Palabras', value: words.toLocaleString() },
+            { label: 'Minutos', value: String(minutes) },
+            { label: 'Clips', value: String(history.length) },
+          ].map(stat => (
+            <div key={stat.label} className="vf-card px-4 py-2 min-w-[92px]">
+              <div className="text-lg font-semibold">{stat.value}</div>
+              <div className="font-mono text-[10px] text-muted-foreground uppercase tracking-wider">
+                {stat.label}
               </div>
-              <Text size="sm" color="muted" className="font-light">
-                No transcriptions yet
-              </Text>
-              <Text size="xs" color="muted" align="center" className="font-light">
-                Start recording to see your transcriptions here
-              </Text>
             </div>
-          ) : (
-            <div className="space-y-2">
-              {history.map((item) => (
-                <div key={item.id} className="bg-card border border-border rounded-lg p-3 hover:bg-accent/50 transition-colors group">
-                  <div className="flex justify-between items-start mb-2">
-                    <Heading level={4} size="sm" className="font-medium text-foreground group-hover:text-primary transition-colors">
-                      {getTitleFromText(item.text)}
-                    </Heading>
-                    <Badge variant="secondary" className="text-xs px-2 py-1 rounded-full bg-primary/10 text-primary font-light">
+          ))}
+        </div>
+      </div>
+
+      <div className="relative">
+        <Search
+          size={16}
+          className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground"
+        />
+        <input
+          value={query}
+          onChange={e => setQuery(e.target.value)}
+          placeholder="Buscar dictados, conceptos, jerga…"
+          className="w-full vf-inset rounded-full pl-11 pr-4 py-2.5 text-sm bg-surface-2 border-0"
+        />
+      </div>
+
+      {filtered.length === 0 ? (
+        <div className="vf-card p-10 text-center text-sm text-muted-foreground">
+          Aún no hay transcripciones. Dicta con {ptt} para empezar.
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 xl:grid-cols-[1fr_320px] gap-4">
+          <div className="space-y-3">
+            {filtered.map(item => {
+              const active = selected?.id === item.id;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => setSelectedId(item.id)}
+                  className={`w-full text-left vf-card p-4 transition-shadow ${active ? 'ring-1 ring-primary/70' : ''}`}
+                >
+                  <div className="flex items-center justify-between gap-3 mb-2">
+                    <h3 className="text-sm font-semibold truncate">
+                      {item.text.split('.')[0]}
+                    </h3>
+                    <span className="font-mono text-[10px] text-muted-foreground shrink-0">
                       {getTimeAgo(item.created_at)}
-                    </Badge>
+                    </span>
                   </div>
-
-                  <Text size="sm" color="muted" className="leading-relaxed mb-2 font-light">
-                    {getPreviewText(item.text)}
-                  </Text>
-
-                  <div className="flex justify-between items-center">
-                    <div className="flex gap-4 text-xs text-muted-foreground font-light">
-                      <span className="flex items-center gap-1">
-                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        {formatDuration(item.duration_ms)}
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 4V2a1 1 0 011-1h8a1 1 0 011 1v2m0 0V1a1 1 0 011-1h2a1 1 0 011 1v18a1 1 0 01-1 1H4a1 1 0 01-1-1V1a1 1 0 011-1h2a1 1 0 011 1v3m0 0h8" />
-                        </svg>
-                        {formatFileSize(item.file_size_bytes)}
-                      </span>
-                      <Badge variant="outline" className="text-xs px-2 py-0.5 rounded-full border-muted-foreground/20 font-light">
-                        {item.model_used}
-                      </Badge>
-                      {item.language && (
-                        <Badge variant="outline" className="text-xs px-2 py-0.5 rounded-full border-muted-foreground/20 font-light">
-                          {item.language}
-                        </Badge>
-                      )}
-                    </div>
-
-                    <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button
-                        onClick={() => handleCopyToClipboard(item.text)}
-                        className="text-xs text-primary hover:text-primary/80 transition-colors px-2 py-1 rounded hover:bg-primary/10 font-light flex items-center gap-1"
-                      >
-                        <Copy size={12} />
-                        Copy
-                      </button>
-                      <button
-                        onClick={() => handleDownloadAudio(item)}
-                        className="text-xs text-blue-600 hover:text-blue-800 transition-colors px-2 py-1 rounded hover:bg-blue-100 font-light flex items-center gap-1"
-                      >
-                        <Download size={12} />
-                        Download
-                      </button>
-                      <button
-                        onClick={() => removeTranscription(item.id)}
-                        className="text-xs text-destructive hover:text-destructive/80 transition-colors px-2 py-1 rounded hover:bg-destructive/10 font-light flex items-center gap-1"
-                      >
-                        <Trash2 size={12} />
-                        Delete
-                      </button>
-                    </div>
+                  <p className="text-sm text-muted-foreground line-clamp-2 mb-3">
+                    {item.text}
+                  </p>
+                  <div className="flex items-center gap-3 font-mono text-[10px] text-muted-foreground">
+                    <span>{formatDuration(item.duration_ms)}</span>
+                    <span className="px-2 py-0.5 rounded-full bg-surface-4">
+                      {item.model_used}
+                    </span>
+                    {item.language && <span>{item.language}</span>}
                   </div>
+                </button>
+              );
+            })}
+          </div>
+
+          {selected && (
+            <aside className="vf-card p-5 h-fit sticky top-4 space-y-4">
+              <div>
+                <div className="font-mono text-[10px] text-cyan uppercase tracking-wider mb-2">
+                  Detalle
                 </div>
-              ))}
-            </div>
+                <p className="text-sm leading-relaxed">{selected.text}</p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Action
+                  onClick={() => copyToClipboard(selected.text)}
+                  icon={Copy}
+                  label="Copiar"
+                />
+                <Action
+                  onClick={async () => {
+                    try {
+                      await insertionService.insertText(selected.text);
+                      toast.success('Pegado');
+                    } catch (e) {
+                      toast.error(String(e));
+                    }
+                  }}
+                  icon={ClipboardPaste}
+                  label="Pegar"
+                />
+                <Action
+                  onClick={async () => {
+                    const replacement = window.prompt(
+                      'Texto corregido',
+                      selected.text
+                    );
+                    if (!replacement) return;
+                    await dictionaryService.applyCorrection(
+                      selected.raw_text || selected.text,
+                      replacement
+                    );
+                    toast.success('Diccionario actualizado');
+                  }}
+                  icon={SpellCheck}
+                  label="Corregir"
+                />
+                <Action
+                  onClick={async () => {
+                    const timestamp = new Date(selected.created_at)
+                      .toISOString()
+                      .split('T')[0];
+                    await downloadAudioFile(
+                      selected.id,
+                      `murmullo_${timestamp}_${selected.id.substring(0, 8)}.wav`
+                    );
+                  }}
+                  icon={Download}
+                  label="Audio"
+                />
+                <Action
+                  onClick={() => removeTranscription(selected.id)}
+                  icon={Trash2}
+                  label="Borrar"
+                />
+              </div>
+            </aside>
           )}
-        </Section>
-      </Container>
+        </div>
+      )}
     </div>
+  );
+}
+
+function Action({
+  onClick,
+  icon: Icon,
+  label,
+}: {
+  onClick: () => void;
+  icon: typeof Copy;
+  label: string;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-surface-4 text-xs hover:bg-primary hover:text-primary-foreground transition-colors"
+    >
+      <Icon size={12} />
+      {label}
+    </button>
   );
 }

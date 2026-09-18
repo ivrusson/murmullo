@@ -95,10 +95,7 @@
     "*.{js,jsx,json,css,md}": [
       "prettier --write"
     ],
-    "src-tauri/**/*.rs": [
-      "cargo fmt",
-      "cargo clippy --fix --allow-dirty --allow-staged"
-    ]
+    "src-tauri/**/*.rs": "sh -c 'cargo fmt --manifest-path src-tauri/Cargo.toml --all'"
   },
   "config": {
     "commitizen": {

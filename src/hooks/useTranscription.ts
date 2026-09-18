@@ -1,5 +1,9 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { audioService, transcriptionService, insertionService } from '../services/tauri';
+import {
+  audioService,
+  transcriptionService,
+  insertionService,
+} from '../services/tauri';
 import type { TranscriptionResult, AudioLevel } from '../types';
 
 export interface UseTranscriptionReturn {
@@ -9,13 +13,13 @@ export interface UseTranscriptionReturn {
   transcription: string;
   error: string | null;
   audioLevel: number;
-  
+
   // Actions
   startRecording: (deviceId: string) => Promise<void>;
   stopRecording: () => Promise<void>;
   insertText: (text?: string) => Promise<void>;
   clearTranscription: () => void;
-  
+
   // Audio level monitoring
   startAudioLevelMonitoring: () => void;
   stopAudioLevelMonitoring: () => void;
@@ -27,8 +31,10 @@ export function useTranscription(): UseTranscriptionReturn {
   const [transcription, setTranscription] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [audioLevel, setAudioLevel] = useState(0);
-  
-  const audioLevelIntervalRef = useRef<number | null>(null);
+
+  const audioLevelIntervalRef = useRef<ReturnType<typeof setInterval> | null>(
+    null
+  );
 
   const startRecording = useCallback(async (deviceId: string) => {
     try {
@@ -36,7 +42,9 @@ export function useTranscription(): UseTranscriptionReturn {
       await audioService.startRecording(deviceId);
       setIsRecording(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to start recording');
+      setError(
+        err instanceof Error ? err.message : 'Failed to start recording'
+      );
     }
   }, []);
 
@@ -45,28 +53,34 @@ export function useTranscription(): UseTranscriptionReturn {
       setIsRecording(false);
       setIsProcessing(true);
       setError(null);
-      
+
       const audioData = await audioService.stopRecording();
-      const result: TranscriptionResult = await transcriptionService.transcribeAudio(audioData);
-      
+      const result: TranscriptionResult =
+        await transcriptionService.transcribeAudio(audioData);
+
       setTranscription(result.text); // Replace instead of accumulate
       setIsProcessing(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to transcribe audio');
+      setError(
+        err instanceof Error ? err.message : 'Failed to transcribe audio'
+      );
       setIsProcessing(false);
     }
   }, []);
 
-  const insertText = useCallback(async (text?: string) => {
-    try {
-      const textToInsert = text || transcription;
-      if (textToInsert) {
-        await insertionService.insertText(textToInsert);
+  const insertText = useCallback(
+    async (text?: string) => {
+      try {
+        const textToInsert = text || transcription;
+        if (textToInsert) {
+          await insertionService.insertText(textToInsert);
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to insert text');
       }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to insert text');
-    }
-  }, [transcription]);
+    },
+    [transcription]
+  );
 
   const clearTranscription = useCallback(() => {
     setTranscription('');
@@ -75,7 +89,7 @@ export function useTranscription(): UseTranscriptionReturn {
 
   const startAudioLevelMonitoring = useCallback(() => {
     if (audioLevelIntervalRef.current) return;
-    
+
     audioLevelIntervalRef.current = setInterval(async () => {
       try {
         const level: AudioLevel = await audioService.getAudioLevel();

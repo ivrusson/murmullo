@@ -1,13 +1,16 @@
+import type { ThemePreference } from '../lib/theme';
+
 export interface TranscriptionRecord {
   id: string;
   text: string;
+  raw_text?: string | null;
   audio_file_path: string;
   duration_ms: number;
   file_size_bytes: number;
   model_used: string;
   language?: string;
-  created_at: string; // ISO 8601 datetime string
-  updated_at: string; // ISO 8601 datetime string
+  created_at: string;
+  updated_at: string;
   metadata: Record<string, string>;
 }
 
@@ -37,17 +40,17 @@ export interface ModelInfo {
 }
 
 export interface AppConfig {
-  whisper: WhisperConfig;
+  runtime: RuntimeConfig;
   audio: AudioConfig;
-  vad: VadConfig;
   hotkeys: HotkeyConfig;
   ui: UiConfig;
-  selected_model?: string;
 }
 
-export interface WhisperConfig {
-  temperature: number;
-  best_of: number;
+export interface RuntimeConfig {
+  stt_port: number;
+  llm_url: string;
+  llm_model: string;
+  llm_enabled: boolean;
   default_language?: string;
 }
 
@@ -58,21 +61,19 @@ export interface AudioConfig {
   noise_reduction: boolean;
   normalization: boolean;
   silence_threshold: number;
-}
-
-export interface VadConfig {
-  enabled: boolean;
-  sensitivity: number;
-  silence_timeout: number;
-}
-
-export interface HotkeyConfig {
-  toggle_recording: string;
-  push_to_talk: string;
+  min_audio_length: number;
 }
 
 export interface UiConfig {
-  theme: string;
+  theme: ThemePreference;
+  language: string;
   show_debug_info: boolean;
   auto_save_transcriptions: boolean;
+  selected_model?: string;
+}
+
+export interface HotkeyConfig {
+  enabled?: boolean;
+  toggle_recording: string;
+  push_to_talk: string;
 }

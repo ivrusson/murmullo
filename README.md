@@ -1,16 +1,20 @@
 # 🗣️ Murmullo - Offline Voice Dictation
 
-Murmullo is an open-source application that allows you to dictate text in any application (Teams, Cursor, VSCode, Slack, etc.) completely offline. It uses local speech recognition models (Whisper) without internet connection, preserving privacy and offering a smooth voice dictation experience.
+Murmullo is an open-source desktop dictation wrapper. It records locally, transcribes with
+**nemo-speech + Parakeet TDT 0.6B v3**, optionally rewrites with a local LLM + personal dictionary,
+and pastes into the focused app.
 
-## 🎯 Key Features
+See [spec/REWRITE.md](spec/REWRITE.md) for the architecture and
+[spec/DECISIONS.md](spec/DECISIONS.md) for implementation decisions.
 
-- **Completely Offline**: No internet connection, no telemetry
-- **Cross-platform**: Windows, macOS, Linux
-- **Modern Interface**: Built with Tauri + React + Tailwind CSS
-- **Whisper Models**: Support for local models of different sizes
-- **Real-time Visualization**: Microphone audio waveform
-- **Model Management**: Download and selection of local models
-- **macOS Permissions**: Automatic configuration of required permissions
+## Features
+
+- **Offline STT**: `nemo-speech serve` + Parakeet Q8 GGUF
+- **Background app**: tray + hold-to-talk (`⌘ ⌥ T`)
+- **Paste into the active field**: clipboard + Cmd+V (Accessibility permission)
+- **History** of dictations (raw + final text)
+- **Dictionary** that regenerates the LLM system prompt
+- **Optional local LLM** (Ollama-compatible HTTP). If it is down, dictation still works.
 
 ## 🚀 Installation
 
@@ -24,17 +28,20 @@ Murmullo is an open-source application that allows you to dictate text in any ap
 ### Development
 
 1. **Clone the repository**
+
    ```bash
    git clone https://github.com/ivrusson/murmullo.git
    cd murmullo
    ```
 
 2. **Install dependencies**
+
    ```bash
    pnpm install
    ```
 
 3. **Run in development mode**
+
    ```bash
    pnpm tauri dev
    ```
@@ -53,17 +60,14 @@ Murmullo is an open-source application that allows you to dictate text in any ap
    - Accessibility Permission (required)
    - Input Monitoring Permission (optional)
 
-2. **Download Models**: Go to the "Models" tab and download a Whisper model:
-   - **Tiny**: Faster, lower accuracy (~39MB)
-   - **Base**: Good balance (~142MB)
-   - **Small**: Better accuracy (~244MB)
-   - **Medium**: High accuracy (~769MB)
-   - **Large**: Maximum accuracy (~1.55GB)
+2. **Runtimes**: Open the Runtimes tab.
+   - Install [nemo-speech](https://github.com/NVIDIA/NeMo-Speech.cpp) (or set `NEMO_SPEECH_BIN`)
+   - Download Parakeet Q8 (~714 MB)
+   - Start the STT server (auto-starts on launch once the model is present)
+   - Optionally install [Ollama](https://ollama.com) and start the LLM
 
-3. **Configure**: Go to "Settings" to:
-   - Select the downloaded model
-   - Configure language
-   - Adjust transcription parameters
+3. **Dictate**: Hold `⌘ ⌥ T`, speak, release. Text is corrected (dictionary ± LLM) and pasted into
+   the focused app.
 
 ### Voice Dictation
 
@@ -75,9 +79,11 @@ Murmullo is an open-source application that allows you to dictate text in any ap
 
 ### Floating Bar
 
-The floating bar is a key feature that provides a compact, always-on-top interface for voice dictation:
+The floating bar is a key feature that provides a compact, always-on-top interface for voice
+dictation:
 
 #### **Visual States**
+
 - **Idle**: Shows microphone icon and "Press to record" text
 - **Recording**: Displays animated waveform and recording indicator
 - **Processing**: Shows loading dots while transcribing audio
@@ -85,6 +91,7 @@ The floating bar is a key feature that provides a compact, always-on-top interfa
 - **Error**: Shows error message with tooltip above the bar
 
 #### **Features**
+
 - **Glassmorphism Design**: Semi-transparent background with blur effects
 - **Dynamic Sizing**: Adapts width based on content (max 260px × 30px)
 - **Always On Top**: Stays visible above other applications
@@ -93,6 +100,7 @@ The floating bar is a key feature that provides a compact, always-on-top interfa
 - **Responsive Layout**: Compact design that doesn't interfere with workflow
 
 #### **Usage**
+
 1. The floating bar appears automatically when the app starts
 2. Click anywhere on the bar to start recording
 3. Visual feedback shows recording state with animated waveform
@@ -102,27 +110,23 @@ The floating bar is a key feature that provides a compact, always-on-top interfa
 
 ## 🏗️ Architecture
 
-### Frontend (React + Tailwind CSS)
-- **DashboardPage**: Main page with recording controls and audio visualization
-- **SettingsPage**: Model and parameter configuration with ComboBox components
-- **ModelsPage**: Whisper model download management with progress tracking
-- **TranscriptionsPage**: Transcription history with search and filtering
-- **PermissionsPage**: System permissions configuration and status
-- **FloatingBar**: Always-on-top dictation bar with glassmorphism design
-- **FloatingBarStates**: Visual state components (Idle, Recording, Processing, Complete, Error)
-- **GlobalSelectors**: Global device, language and model selectors
-- **WaveformVisualization**: Real-time audio waveform display
+Murmullo is a thin desktop wrapper (see [spec/REWRITE.md](spec/REWRITE.md)):
 
-### Backend (Rust + Tauri)
-- **ModelManager**: Local Whisper model management
-- **AudioCapture**: Microphone audio capture (in development)
-- **TranscriptionEngine**: Transcription engine with whisper-rs (in development)
-- **TextInserter**: Text insertion in applications (in development)
+- **RuntimeManager**: starts/stops `nemo-speech serve` and optional Ollama on localhost
+- **AudioCapture / AudioProcessor**: 16 kHz capture + speech gate
+- **HTTP STT client**: `POST /v1/audio/transcriptions` (Parakeet Q8 GGUF)
+- **Dictionary + PostProcessor**: deterministic replacements, then optional LLM rewrite
+- **TextInserter**: clipboard + Cmd+V (Accessibility on macOS)
+- **History / overlay / tray**: hold-to-talk, paste into the focused app
+
+Frontend pages: Historial, Instalador (Runtimes), Diccionario, Permissions, Settings.
 
 ## 🔧 Development
 
 ### Spec-First Methodology
+
 This project uses a **spec-first** methodology with complete documentation in the `spec/` folder:
+
 - **ONEPAGER.md**: Project overview
 - **FEATURES.md**: Detailed feature breakdown
 - **IMPLEMENTATION-ROADMAP.md**: 8-week roadmap
@@ -151,9 +155,12 @@ murmullo/
 ├── src-tauri/              # Backend Rust
 │   ├── src/
 │   │   ├── audio/          # Audio capture and processing
-│   │   ├── models/         # Whisper model management
-│   │   ├── transcription/  # Transcription engine
-│   │   ├── insertion/      # Text insertion
+│   │   ├── runtime/        # nemo-speech / LLM process manager
+│   │   ├── dictionary/     # Local terms + versioned prompt
+│   │   ├── postprocess/    # Dictionary then LLM
+│   │   ├── models/         # Parakeet GGUF download
+│   │   ├── transcription/  # HTTP STT client + history
+│   │   ├── insertion/      # Paste into focused app
 │   │   ├── commands.rs     # Tauri commands
 │   │   └── lib.rs         # Entry point
 │   └── Cargo.toml         # Rust dependencies
@@ -181,29 +188,22 @@ pnpm dev                   # Frontend development server
 ## 🛠️ Development Status
 
 ### ✅ Implemented
-- [x] Complete UI with Tailwind CSS and shadcn/ui components
-- [x] Page system (Dashboard, Settings, Models, Transcriptions, Permissions)
-- [x] Floating bar with glassmorphism design and visual states
-- [x] Real-time audio waveform visualization with animated bars
-- [x] Whisper model management with download and loading
-- [x] macOS permissions configuration and status checking
-- [x] Transcription system with SQLite database persistence
-- [x] ComboBox and modern UI components with proper styling
-- [x] Error handling with tooltips and auto-recovery
-- [x] Complete Tauri commands structure for all features
-- [x] Build and distribution system
 
-### 🚧 In Development
-- [ ] Complete audio capture integration with cpal
-- [ ] Fully functional transcription engine with whisper-rs
-- [ ] Text insertion with enigo
-- [ ] Global hotkeys for push-to-talk
-- [ ] Automatic model download from Hugging Face
-- [ ] UI/UX improvements and polish
-- [ ] Enhanced floating bar interactions
-- [ ] Better visual feedback and animations
+- [x] Desktop wrapper around nemo-speech + Parakeet Q8
+- [x] Runtime installer (CLI, GGUF, STT server, optional LLM)
+- [x] Hold-to-talk, paste into the focused app, history
+- [x] Dictionary + versioned system prompt
+- [x] Overlay bar states (idle / recording / processing / done / error)
+- [x] Tray + close-to-background
+
+### 🚧 Later
+
+- [ ] Overlay visual redesign
+- [ ] Package `nemo-speech` as a Tauri externalBin
+- [ ] LLM runtime choice beyond Ollama HTTP
 
 ### 📋 Upcoming Features
+
 - [ ] GPU/Metal support for macOS
 - [ ] Local REST API for integrations
 - [ ] Server mode for external plugins
@@ -213,6 +213,7 @@ pnpm dev                   # Frontend development server
 ### 🎨 Planned UI/UX Improvements
 
 #### **Visual Enhancements**
+
 - [ ] **Dark/Light Theme Toggle**: System preference detection and manual switching
 - [ ] **Custom Color Schemes**: User-defined accent colors and themes
 - [ ] **Improved Typography**: Better font hierarchy and readability
@@ -220,6 +221,7 @@ pnpm dev                   # Frontend development server
 - [ ] **Loading States**: Better skeleton screens and progress indicators
 
 #### **Floating Bar Improvements**
+
 - [ ] **Customizable Position**: Drag to reposition, remember location
 - [ ] **Size Options**: Small, medium, large floating bar variants
 - [ ] **Transparency Controls**: Adjustable opacity levels
@@ -227,6 +229,7 @@ pnpm dev                   # Frontend development server
 - [ ] **Keyboard Shortcuts**: Direct keyboard control without clicking
 
 #### **Main Interface Enhancements**
+
 - [ ] **Dashboard Redesign**: More intuitive layout with better information hierarchy
 - [ ] **Settings Organization**: Grouped settings with search functionality
 - [ ] **Model Management**: Visual model comparison and performance metrics
@@ -234,6 +237,7 @@ pnpm dev                   # Frontend development server
 - [ ] **Accessibility**: Screen reader support and keyboard navigation
 
 #### **User Experience**
+
 - [ ] **Onboarding Flow**: Interactive tutorial for new users
 - [ ] **Tooltips and Help**: Contextual help throughout the interface
 - [ ] **Error Recovery**: Better error messages with suggested actions
@@ -254,8 +258,8 @@ This project is licensed under the MIT License. See the `LICENSE` file for more 
 
 ## 🙏 Acknowledgments
 
-- [Whisper](https://github.com/openai/whisper) - OpenAI's speech recognition model
-- [whisper.cpp](https://github.com/ggerganov/whisper.cpp) - Efficient C++ implementation
+- [NeMo-Speech.cpp](https://github.com/NVIDIA/NeMo-Speech.cpp) - Local ASR server
+- [Parakeet TDT](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3) - NVIDIA multilingual ASR
 - [Tauri](https://tauri.app/) - Desktop application framework
 - [Tailwind CSS](https://tailwindcss.com/) - Utility-first CSS framework
 

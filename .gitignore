@@ -27,6 +27,9 @@ out/
 .env.test.local
 .env.production.local
 
+# Local MCP secrets
+.cursor/mcp.json
+
 # IDE and editor files
 .vscode/
 .idea/

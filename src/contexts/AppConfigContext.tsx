@@ -1,193 +1,129 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { configService, audioService, modelService } from '../services/tauri';
-import type { AppConfig, AudioDevice, ModelInfo } from '../types';
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+  ReactNode,
+} from 'react';
+import { listen } from '@tauri-apps/api/event';
+import { configService, audioService, runtimeService } from '../services/tauri';
+import type { AppConfig, AudioDevice, RuntimeStatus } from '../types';
 
 interface AppConfigContextType {
-  // Configuration
   config: AppConfig | null;
   isLoading: boolean;
-  updateConfig: (updates: Partial<AppConfig>) => Promise<void>;
-  
-  // Audio devices
   audioDevices: AudioDevice[];
   selectedDevice: string;
   setSelectedDevice: (deviceId: string) => void;
-  
-  // Models
-  models: ModelInfo[];
-  selectedModel: string;
-  setSelectedModel: (modelName: string) => void;
-  
-  // Language
   selectedLanguage: string;
   setSelectedLanguage: (language: string) => void;
-  
-  // Refresh functions
+  runtimeStatus: RuntimeStatus | null;
+  refreshConfig: () => Promise<void>;
   refreshAudioDevices: () => Promise<void>;
-  refreshModels: () => Promise<void>;
+  refreshRuntime: () => Promise<void>;
 }
 
-const AppConfigContext = createContext<AppConfigContextType | undefined>(undefined);
+const AppConfigContext = createContext<AppConfigContextType | undefined>(
+  undefined
+);
 
-interface AppConfigProviderProps {
-  children: ReactNode;
-}
-
-export const AppConfigProvider: React.FC<AppConfigProviderProps> = ({ children }) => {
+export const AppConfigProvider: React.FC<{ children: ReactNode }> = ({
+  children,
+}) => {
   const [config, setConfig] = useState<AppConfig | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [audioDevices, setAudioDevices] = useState<AudioDevice[]>([]);
-  const [selectedDevice, setSelectedDevice] = useState<string>('');
-  const [models, setModels] = useState<ModelInfo[]>([]);
-  const [selectedModel, setSelectedModel] = useState<string>('');
-  const [selectedLanguage, setSelectedLanguage] = useState<string>('auto');
+  const [selectedDevice, setSelectedDevice] = useState('');
+  const [selectedLanguage, setSelectedLanguage] = useState('auto');
+  const [runtimeStatus, setRuntimeStatus] = useState<RuntimeStatus | null>(
+    null
+  );
 
-  // Load initial configuration
+  const refreshConfig = useCallback(async () => {
+    const appConfig = await configService.getConfig();
+    setConfig(appConfig);
+    setSelectedLanguage(appConfig.runtime?.default_language || 'auto');
+  }, []);
+
   useEffect(() => {
-    const loadInitialConfig = async () => {
+    const load = async () => {
       try {
         setIsLoading(true);
-        console.log('🔄 Loading global app configuration...');
-        
-        // Load app config
-        const appConfig = await configService.getConfig();
-        setConfig(appConfig);
-        
-        // Set language from config
-        const defaultLanguage = appConfig.whisper.default_language || 'auto';
-        setSelectedLanguage(defaultLanguage);
-        console.log('🌍 Default language loaded:', defaultLanguage);
-        
-        // Load audio devices
+        await refreshConfig();
         const devices = await audioService.listDevices();
         setAudioDevices(devices);
         if (devices.length > 0) {
           setSelectedDevice(devices[0].id);
         }
-        
-        // Load models
-        const modelList = await modelService.listModels();
-        setModels(modelList);
-        
-        // Get selected model from config
-        const selectedModelName = await configService.getSelectedModel();
-        if (selectedModelName) {
-          setSelectedModel(selectedModelName);
-        } else if (modelList.length > 0) {
-          // Auto-select first downloaded model
-          const downloadedModel = modelList.find(m => m.is_downloaded);
-          if (downloadedModel) {
-            setSelectedModel(downloadedModel.name);
-          }
-        }
-        
-        console.log('✅ Global app configuration loaded successfully');
+        setRuntimeStatus(await runtimeService.status());
       } catch (error) {
-        console.error('❌ Error loading global configuration:', error);
+        console.error('Error loading configuration:', error);
       } finally {
         setIsLoading(false);
       }
     };
+    load();
+  }, [refreshConfig]);
 
-    loadInitialConfig();
+  useEffect(() => {
+    const unlisten = listen('hotkeys-updated', () => {
+      void refreshConfig().catch(console.error);
+    });
+    return () => {
+      unlisten.then(fn => fn()).catch(() => undefined);
+    };
+  }, [refreshConfig]);
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      runtimeService
+        .status()
+        .then(setRuntimeStatus)
+        .catch(() => undefined);
+    }, 2500);
+    return () => clearInterval(id);
   }, []);
 
-  // Update configuration
-  const updateConfig = async (updates: Partial<AppConfig>) => {
-    if (!config) return;
-    
-    try {
-      const newConfig = { ...config, ...updates };
-      setConfig(newConfig);
-      
-      // Save to backend
-      if (updates.whisper) {
-        await configService.updateWhisperConfig(
-          updates.whisper.temperature || config.whisper.temperature,
-          updates.whisper.best_of || config.whisper.best_of,
-          updates.whisper.default_language
-        );
-      }
-      
-      console.log('⚙️ Configuration updated:', updates);
-    } catch (error) {
-      console.error('❌ Error updating configuration:', error);
-    }
-  };
-
-  // Refresh audio devices
   const refreshAudioDevices = async () => {
-    try {
-      const devices = await audioService.listDevices();
-      setAudioDevices(devices);
-      if (devices.length > 0 && !selectedDevice) {
-        setSelectedDevice(devices[0].id);
-      }
-    } catch (error) {
-      console.error('❌ Error refreshing audio devices:', error);
+    const devices = await audioService.listDevices();
+    setAudioDevices(devices);
+    if (devices.length > 0 && !selectedDevice) {
+      setSelectedDevice(devices[0].id);
     }
   };
 
-  // Refresh models
-  const refreshModels = async () => {
-    try {
-      const modelList = await modelService.listModels();
-      setModels(modelList);
-      
-      // Update selected model if current one is no longer available
-      const currentModel = modelList.find(m => m.name === selectedModel);
-      if (!currentModel || !currentModel.is_downloaded) {
-        const downloadedModel = modelList.find(m => m.is_downloaded);
-        if (downloadedModel) {
-          setSelectedModel(downloadedModel.name);
-          await configService.updateSelectedModel(downloadedModel.name);
-        }
-      }
-    } catch (error) {
-      console.error('❌ Error refreshing models:', error);
-    }
+  const refreshRuntime = async () => {
+    setRuntimeStatus(await runtimeService.status());
   };
 
-  // Handle language change
   const handleSetSelectedLanguage = async (language: string) => {
     setSelectedLanguage(language);
-    
-    // Update config
-    await updateConfig({
-      whisper: {
-        temperature: config?.whisper?.temperature ?? 0.0,
-        best_of: config?.whisper?.best_of ?? 5,
-        auto_detect: config?.whisper?.auto_detect ?? true,
-        initial_prompt: config?.whisper?.initial_prompt ?? '',
-        default_language: language === 'auto' ? undefined : language
-      }
-    });
-  };
-
-  // Handle model change
-  const handleSetSelectedModel = async (modelName: string) => {
-    setSelectedModel(modelName);
-    await configService.updateSelectedModel(modelName);
-  };
-
-  const value: AppConfigContextType = {
-    config,
-    isLoading,
-    updateConfig,
-    audioDevices,
-    selectedDevice,
-    setSelectedDevice,
-    models,
-    selectedModel,
-    setSelectedModel: handleSetSelectedModel,
-    selectedLanguage,
-    setSelectedLanguage: handleSetSelectedLanguage,
-    refreshAudioDevices,
-    refreshModels,
+    if (config) {
+      await configService.updateRuntimeConfig(
+        config.runtime.llm_enabled,
+        config.runtime.llm_model,
+        language === 'auto' ? undefined : language
+      );
+    }
   };
 
   return (
-    <AppConfigContext.Provider value={value}>
+    <AppConfigContext.Provider
+      value={{
+        config,
+        isLoading,
+        audioDevices,
+        selectedDevice,
+        setSelectedDevice,
+        selectedLanguage,
+        setSelectedLanguage: handleSetSelectedLanguage,
+        runtimeStatus,
+        refreshConfig,
+        refreshAudioDevices,
+        refreshRuntime,
+      }}
+    >
       {children}
     </AppConfigContext.Provider>
   );
@@ -195,7 +131,7 @@ export const AppConfigProvider: React.FC<AppConfigProviderProps> = ({ children }
 
 export const useAppConfig = (): AppConfigContextType => {
   const context = useContext(AppConfigContext);
-  if (context === undefined) {
+  if (!context) {
     throw new Error('useAppConfig must be used within an AppConfigProvider');
   }
   return context;

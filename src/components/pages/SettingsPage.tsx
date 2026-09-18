@@ -1,16 +1,19 @@
 import { useState, useEffect } from 'react';
-import { Container, Section, Flex } from '@/components/layout';
-import { Button, Alert, AlertDescription, Switch, ComboBox, Slider } from '@/components/ui';
-import { Heading, Text, Icon } from '@/components/ui';
-import { Settings, Save, RotateCcw, Info, Keyboard, Mic, Volume2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { configService } from '../../services/tauri';
+import { GlobalSelectors } from '../GlobalSelectors';
+import { HotkeyRecorder } from '../HotkeyRecorder';
+import { ThemeToggle } from '../ThemeToggle';
+import { useAppConfig } from '../../contexts/AppConfigContext';
+import { validateHotkey } from '../../lib/hotkey';
 import type { AppConfig } from '../../types';
 
 export function SettingsPage() {
+  const { refreshConfig } = useAppConfig();
   const [config, setConfig] = useState<AppConfig | null>(null);
   const [hasChanges, setHasChanges] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [hotkeyError, setHotkeyError] = useState<string | null>(null);
 
   useEffect(() => {
     loadConfig();
@@ -19,15 +22,9 @@ export function SettingsPage() {
   const loadConfig = async () => {
     try {
       setIsLoading(true);
-      console.log('🔄 Loading configuration from backend...');
-      const appConfig = await configService.getConfig();
-      console.log('⚙️ Configuration loaded:', appConfig);
-      setConfig(appConfig);
-    } catch (error) {
-      console.error('❌ Error loading configuration:', error);
-      toast.error('Failed to load settings', {
-        description: 'Could not fetch configuration from backend'
-      });
+      setConfig(await configService.getConfig());
+    } catch {
+      toast.error('No se pudieron cargar los ajustes');
     } finally {
       setIsLoading(false);
     }
@@ -35,302 +32,218 @@ export function SettingsPage() {
 
   const handleSave = async () => {
     if (!config) return;
-    
+    const hotkeyProblem = validateHotkey(
+      config.hotkeys.push_to_talk,
+      config.hotkeys.toggle_recording ? [config.hotkeys.toggle_recording] : []
+    );
+    if (hotkeyProblem) {
+      setHotkeyError(hotkeyProblem);
+      toast.error(hotkeyProblem);
+      return;
+    }
     try {
-      console.log('💾 Saving configuration...');
-      
-      // Update audio configuration
       await configService.updateAudioConfig(
         config.audio.noise_reduction,
         config.audio.normalization,
         config.audio.silence_threshold
       );
-      
-      // Update VAD configuration
-      await configService.updateVadConfig(
-        config.vad.enabled,
-        config.vad.sensitivity,
-        config.vad.silence_timeout
+      await configService.updateRuntimeConfig(
+        config.runtime.llm_enabled,
+        config.runtime.llm_model,
+        config.runtime.default_language
       );
-      
-      // Update Whisper configuration
-      await configService.updateWhisperConfig(
-        config.whisper.temperature,
-        config.whisper.best_of,
-        config.whisper.default_language
+      await configService.updateHotkeyConfig(
+        config.hotkeys.push_to_talk,
+        config.hotkeys.enabled
       );
-      
       setHasChanges(false);
-      toast.success('Settings saved', {
-        description: 'Your preferences have been updated successfully'
-      });
+      setHotkeyError(null);
+      await refreshConfig();
+      toast.success('Ajustes guardados');
     } catch (error) {
-      console.error('❌ Error saving configuration:', error);
-      toast.error('Save failed', {
-        description: 'Could not save your settings'
-      });
-    }
-  };
-
-  const handleReset = async () => {
-    try {
-      console.log('🔄 Resetting configuration to defaults...');
-      await configService.resetToDefaults();
-      await loadConfig();
-      setHasChanges(false);
-      toast.info('Settings reset', {
-        description: 'All settings have been reset to default values'
-      });
-    } catch (error) {
-      console.error('❌ Error resetting configuration:', error);
-      toast.error('Reset failed', {
-        description: 'Could not reset settings to defaults'
-      });
+      const message =
+        typeof error === 'string'
+          ? error
+          : error instanceof Error
+            ? error.message
+            : 'No se pudo guardar';
+      setHotkeyError(message);
+      toast.error(message);
     }
   };
 
   return (
-    <div className="min-h-full bg-background">
-      <Container size="lg" padding="sm">
-        <Section spacing="md">
-          {/* Header */}
-          <Flex direction="column" gap="xs" className="mb-6">
-            <Flex align="center" gap="sm">
-              <Icon icon={Settings} size="lg" color="primary" />
-              <Heading level={1} size="xl" className="font-semibold">Settings</Heading>
-            </Flex>
-            <Text color="muted" size="sm" className="font-light">Configure Murmullo to your preferences</Text>
-          </Flex>
+    <div className="min-h-full px-6 py-6 space-y-5">
+      <div className="flex items-end justify-between gap-4">
+        <div>
+          <h1 className="text-[28px] font-semibold tracking-tight">
+            Configuración & Diccionario
+          </h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Apariencia, audio, atajos e inserción local
+          </p>
+        </div>
+        <button
+          onClick={handleSave}
+          disabled={
+            !hasChanges || isLoading || !config?.hotkeys.push_to_talk?.trim()
+          }
+          className="rounded-full bg-primary text-primary-foreground px-4 py-2 text-sm font-medium disabled:opacity-40"
+        >
+          Guardar
+        </button>
+      </div>
 
-          {isLoading ? (
-            <div className="flex justify-center items-center py-8">
-              <Flex justify="center" align="center" gap="sm">
-                <Icon icon={Settings} size="sm" className="animate-spin" />
-                <Text className="font-light">Loading settings...</Text>
-              </Flex>
+      {isLoading ? (
+        <div className="space-y-4">
+          <AppearanceCard />
+          <div className="vf-card p-6 text-sm text-muted-foreground">
+            Cargando ajustes…
+          </div>
+        </div>
+      ) : !config ? (
+        <div className="space-y-4">
+          <AppearanceCard />
+          <div className="vf-card p-6 text-sm text-muted-foreground">
+            No se pudieron cargar los ajustes. Abre Murmullo como app de
+            escritorio.
+          </div>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+          <AppearanceCard />
+
+          <section className="vf-card p-5 space-y-4">
+            <div className="font-mono text-[10px] text-cyan uppercase tracking-wider">
+              Dispositivo de entrada
             </div>
-          ) : !config ? (
-            <Alert variant="destructive">
-              <AlertDescription>
-                Failed to load settings. Please try refreshing the page.
-              </AlertDescription>
-            </Alert>
-          ) : (
-            <>
-              {/* Save/Reset Actions */}
-              {hasChanges && (
-                <Alert className="mb-6">
-                  <Icon icon={Info} size="sm" />
-                  <AlertDescription>
-                    You have unsaved changes. Don't forget to save your settings.
-                  </AlertDescription>
-                </Alert>
-              )}
+            <GlobalSelectors />
+          </section>
 
-              <Flex justify="between" align="center" className="mb-6">
-                <Text color="muted" size="sm" className="font-light">Configure your preferences below</Text>
-                <Flex gap="sm">
-                  <Button variant="outline" onClick={handleReset} size="sm">
-                    <Icon icon={RotateCcw} size="sm" />
-                    Reset
-                  </Button>
-                  <Button onClick={handleSave} disabled={!hasChanges} size="sm">
-                    <Icon icon={Save} size="sm" />
-                    Save Changes
-                  </Button>
-                </Flex>
-              </Flex>
+          <section className="vf-card p-5 space-y-4">
+            <div className="font-mono text-[10px] text-cyan uppercase tracking-wider">
+              Atajos globales
+            </div>
+            <HotkeyRecorder
+              value={config.hotkeys.push_to_talk}
+              occupied={
+                config.hotkeys.toggle_recording
+                  ? [config.hotkeys.toggle_recording]
+                  : []
+              }
+              onChange={async next => {
+                await configService.updateHotkeyConfig(
+                  next,
+                  config.hotkeys.enabled
+                );
+                setHotkeyError(null);
+                setConfig({
+                  ...config,
+                  hotkeys: { ...config.hotkeys, push_to_talk: next },
+                });
+                await refreshConfig();
+                toast.success('Atajo actualizado');
+              }}
+            />
+            {hotkeyError && (
+              <p className="text-xs text-destructive">{hotkeyError}</p>
+            )}
+            <p className="text-xs text-muted-foreground">
+              Mantén pulsado para dictar. El atajo nuevo se aplica al instante,
+              sin reiniciar.
+            </p>
+          </section>
 
-              {/* Hotkeys Settings */}
-              <div className="mb-8">
-                <Flex align="center" gap="sm" className="mb-4">
-                  <Icon icon={Keyboard} size="md" color="primary" />
-                  <Heading level={2} size="lg" className="font-semibold text-foreground">Hotkeys</Heading>
-                </Flex>
-                <Text size="sm" color="muted" className="font-light mb-4">
-                  Configure keyboard shortcuts for recording functionality.
-                </Text>
-                
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center py-3 px-4 bg-surface-2 border border-border/50 rounded-lg">
-                    <Flex direction="column" gap="xs">
-                      <Text weight="medium" className="text-foreground">Push to Talk</Text>
-                      <Text size="sm" color="muted" className="font-light">Hold to record while pressed</Text>
-                    </Flex>
-                    <div className="px-3 py-1 bg-primary/10 text-primary border border-primary/20 rounded-md font-mono text-sm">
-                      {config.hotkeys.push_to_talk}
-                    </div>
-                  </div>
-                </div>
-              </div>
+          <section className="vf-card p-5 space-y-4">
+            <div className="font-mono text-[10px] text-cyan uppercase tracking-wider">
+              Cancelación y audio
+            </div>
+            <Toggle
+              label="Reducción de ruido"
+              description="Filtra el fondo antes del STT"
+              checked={config.audio.noise_reduction}
+              onChange={checked => {
+                setConfig({
+                  ...config,
+                  audio: { ...config.audio, noise_reduction: checked },
+                });
+                setHasChanges(true);
+              }}
+            />
+            <Toggle
+              label="Normalización"
+              description="Nivela el volumen del clip"
+              checked={config.audio.normalization}
+              onChange={checked => {
+                setConfig({
+                  ...config,
+                  audio: { ...config.audio, normalization: checked },
+                });
+                setHasChanges(true);
+              }}
+            />
+          </section>
 
-              {/* Divider */}
-              <div className="border-t border-border/50 mb-8"></div>
-
-              {/* Audio Settings */}
-              <div className="mb-8">
-                <Flex align="center" gap="sm" className="mb-4">
-                  <Icon icon={Volume2} size="md" color="primary" />
-                  <Heading level={2} size="lg" className="font-semibold text-foreground">Audio</Heading>
-                </Flex>
-                <Text size="sm" color="muted" className="font-light mb-4">
-                  Configure audio input settings for optimal recording quality.
-                </Text>
-                
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="flex flex-col gap-2">
-                    <Text weight="medium" className="text-foreground text-sm">Sample Rate</Text>
-                    <ComboBox
-                      options={[
-                        { value: "22050", label: "22.05 kHz" },
-                        { value: "44100", label: "44.1 kHz" },
-                        { value: "48000", label: "48 kHz" }
-                      ]}
-                      value={config.audio.sample_rate.toString()}
-                      onValueChange={(value) => {
-                        setConfig({...config, audio: {...config.audio, sample_rate: Number(value)}});
-                        setHasChanges(true);
-                      }}
-                      triggerClassName="h-9"
-                    />
-                  </div>
-                  
-                  <div className="flex flex-col gap-2">
-                    <Text weight="medium" className="text-foreground text-sm">Channels</Text>
-                    <ComboBox
-                      options={[
-                        { value: "1", label: "Mono" },
-                        { value: "2", label: "Stereo" }
-                      ]}
-                      value={config.audio.channels.toString()}
-                      onValueChange={(value) => {
-                        setConfig({...config, audio: {...config.audio, channels: Number(value)}});
-                        setHasChanges(true);
-                      }}
-                      triggerClassName="h-9"
-                    />
-                  </div>
-                  
-                  <div className="flex flex-col gap-2">
-                    <Text weight="medium" className="text-foreground text-sm">Bit Depth</Text>
-                    <ComboBox
-                      options={[
-                        { value: "16", label: "16-bit" },
-                        { value: "24", label: "24-bit" },
-                        { value: "32", label: "32-bit" }
-                      ]}
-                      value={config.audio.bit_depth.toString()}
-                      onValueChange={(value) => {
-                        setConfig({...config, audio: {...config.audio, bit_depth: Number(value)}});
-                        setHasChanges(true);
-                      }}
-                      triggerClassName="h-9"
-                    />
-                  </div>
-                </div>
-
-                <div className="mt-4 space-y-3">
-                  <div className="flex items-center justify-between py-2">
-                    <Flex direction="column" gap="xs">
-                      <Text weight="medium" className="text-foreground text-sm">Noise Reduction</Text>
-                      <Text size="xs" color="muted" className="font-light">Reduce background noise</Text>
-                    </Flex>
-                    <Switch 
-                      checked={config.audio.noise_reduction}
-                      onCheckedChange={(checked) => {
-                        setConfig({...config, audio: {...config.audio, noise_reduction: checked}});
-                        setHasChanges(true);
-                      }}
-                    />
-                  </div>
-                  
-                  <div className="flex items-center justify-between py-2">
-                    <Flex direction="column" gap="xs">
-                      <Text weight="medium" className="text-foreground text-sm">Normalization</Text>
-                      <Text size="xs" color="muted" className="font-light">Normalize audio levels</Text>
-                    </Flex>
-                    <Switch 
-                      checked={config.audio.normalization}
-                      onCheckedChange={(checked) => {
-                        setConfig({...config, audio: {...config.audio, normalization: checked}});
-                        setHasChanges(true);
-                      }}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Divider */}
-              <div className="border-t border-border/50 mb-8"></div>
-
-              {/* Whisper Settings */}
-              <div className="mb-8">
-                <Flex align="center" gap="sm" className="mb-4">
-                  <Icon icon={Mic} size="md" color="primary" />
-                  <Heading level={2} size="lg" className="font-semibold text-foreground">Whisper Configuration</Heading>
-                </Flex>
-                <Text size="sm" color="muted" className="font-light mb-4">
-                  Configure Whisper model parameters for transcription.
-                </Text>
-                
-                <div className="grid grid-cols-2 gap-4 mb-4">
-                  <div className="flex flex-col gap-2">
-                    <Text weight="medium" className="text-foreground text-sm">Temperature</Text>
-                    <Slider
-                      value={[config.whisper.temperature]}
-                      onValueChange={(value) => {
-                        setConfig({...config, whisper: {...config.whisper, temperature: value[0]}});
-                        setHasChanges(true);
-                      }}
-                      max={1}
-                      min={0}
-                      step={0.1}
-                      className="w-full"
-                    />
-                    <Text size="xs" color="muted" className="font-light text-center">{config.whisper.temperature}</Text>
-                  </div>
-                  
-                  <div className="flex flex-col gap-2">
-                    <Text weight="medium" className="text-foreground text-sm">Best Of</Text>
-                    <ComboBox
-                      options={[
-                        { value: "1", label: "1" },
-                        { value: "3", label: "3" },
-                        { value: "5", label: "5" }
-                      ]}
-                      value={config.whisper.best_of.toString()}
-                      onValueChange={(value) => {
-                        setConfig({...config, whisper: {...config.whisper, best_of: Number(value)}});
-                        setHasChanges(true);
-                      }}
-                      triggerClassName="h-9"
-                    />
-                  </div>
-                </div>
-                
-                <div className="flex flex-col gap-2">
-                  <Text weight="medium" className="text-foreground text-sm">Default Language</Text>
-                  <ComboBox
-                    options={[
-                      { value: "auto", label: "Auto-detect" },
-                      { value: "en", label: "English" },
-                      { value: "es", label: "Spanish" },
-                      { value: "fr", label: "French" },
-                      { value: "de", label: "German" }
-                    ]}
-                    value={config.whisper.default_language || 'auto'}
-                    onValueChange={(value) => {
-                      setConfig({...config, whisper: {...config.whisper, default_language: value === 'auto' ? undefined : value}});
-                      setHasChanges(true);
-                    }}
-                    triggerClassName="h-9"
-                  />
-                </div>
-              </div>
-            </>
-          )}
-        </Section>
-      </Container>
+          <section className="vf-card p-5 space-y-4">
+            <div className="font-mono text-[10px] text-amber uppercase tracking-wider">
+              Reformulación IA
+            </div>
+            <Toggle
+              label="Reescribir con LLM local"
+              description={`${config.runtime.llm_model} en ${config.runtime.llm_url}`}
+              checked={config.runtime.llm_enabled}
+              onChange={checked => {
+                setConfig({
+                  ...config,
+                  runtime: { ...config.runtime, llm_enabled: checked },
+                });
+                setHasChanges(true);
+              }}
+            />
+          </section>
+        </div>
+      )}
     </div>
+  );
+}
+
+function AppearanceCard() {
+  return (
+    <section className="vf-card p-5 space-y-4">
+      <div className="font-mono text-[10px] text-cyan uppercase tracking-wider">
+        Apariencia
+      </div>
+      <p className="text-sm text-muted-foreground">
+        Cambia entre modo claro, oscuro o el del sistema. Se aplica al instante.
+      </p>
+      <ThemeToggle />
+    </section>
+  );
+}
+
+function Toggle({
+  label,
+  description,
+  checked,
+  onChange,
+}: {
+  label: string;
+  description: string;
+  checked: boolean;
+  onChange: (value: boolean) => void;
+}) {
+  return (
+    <label className="flex items-center justify-between gap-4 vf-inset rounded-xl px-4 py-3 cursor-pointer">
+      <div>
+        <div className="text-sm font-medium">{label}</div>
+        <div className="text-xs text-muted-foreground">{description}</div>
+      </div>
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={e => onChange(e.target.checked)}
+        className="h-5 w-9 accent-primary"
+      />
+    </label>
   );
 }

@@ -1,49 +1,44 @@
 # START HERE
 
-Welcome to the Murmullo specification! This document will guide you through understanding and contributing to the project.
+Murmullo is being rewritten as a **desktop wrapper** around local STT (nemo-speech + Parakeet) and
+an optional local LLM for dictionary learning.
+
+**Current source of truth:** [REWRITE.md](./REWRITE.md) · **Porqués:**
+[DECISIONS.md](./DECISIONS.md)
+
+The documents below describe the original Whisper-era product. Prefer REWRITE.md for architecture
+and DECISIONS.md for why the current code looks the way it does.
 
 ## Quick Start
-1. **Read the ONEPAGER.md** - Get the high-level overview
-2. **Review ACCEPTANCE.md** - Understand what "done" looks like
-3. **Check QUESTIONS.md** - See what decisions need to be made
-4. **Explore features/** - Dive into specific feature specifications
+
+1. **Read [REWRITE.md](./REWRITE.md)** — product thesis, pipeline, runtimes
+2. **Read [DECISIONS.md](./DECISIONS.md)** — decisions from the desktop-wrapper work (hotkey, STT,
+   gate, logs, paste)
+3. **Read ONEPAGER.md** — original high-level overview (Whisper)
+4. **Review ACCEPTANCE.md** — original acceptance criteria
+5. **Explore features/** — original feature specs
 
 ## Project Status
-- **Current Phase**: Bootstrap (specification creation)
-- **Next Phase**: Planning (detailed feature breakdown)
-- **Target**: Working MVP with core transcription functionality
 
-## Key Decisions Needed
-Before moving to implementation, we need answers to the questions in QUESTIONS.md, particularly:
-- Primary use case and target audience
-- Model selection strategy (speed vs accuracy)
-- UI/UX approach for floating interface
-- Integration method priorities
-
-## Getting Involved
-- **Contributors**: Start with ACCEPTANCE.md to understand requirements
-- **Users**: Focus on QUESTIONS.md to help shape the product
-- **Developers**: Check features/ directory for detailed specifications
+- **Current Phase**: Desktop runtime wrapper (nemo-speech + Parakeet + dictionary/LLM)
+- **Branch**: `feat/desktop-runtime-wrapper`
+- **Target**: Wispr Flow-style dictation: background app, hold-to-talk, paste into the focused
+  field, history, learning dictionary
 
 ## Specification Structure
+
 ```
 spec/
-├── ONEPAGER.md          # High-level project overview
-├── ACCEPTANCE.md        # Detailed acceptance criteria
-├── QUESTIONS.md         # Key decisions to resolve
+├── REWRITE.md           # Current rewrite map (start here)
+├── DECISIONS.md         # Why the wrapper behaves this way
+├── ONEPAGER.md          # Original high-level overview
+├── ACCEPTANCE.md        # Original acceptance criteria
+├── QUESTIONS.md         # Original open decisions
 ├── START-HERE.md        # This file
-├── features/            # Individual feature specs
+├── features/            # Original feature specs
 │   ├── audio-recording/
 │   ├── transcription/
 │   ├── ui-floating/
 │   └── integration/
-└── prompts/             # AI prompts for development
-    ├── system/
-    └── tasks/
+└── prompts/
 ```
-
-## Next Steps
-1. Answer key questions from QUESTIONS.md
-2. Create detailed feature specifications
-3. Generate implementation tasks
-4. Begin development with clear acceptance criteria

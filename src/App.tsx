@@ -1,52 +1,56 @@
-import { useState } from "react";
-import { Sidebar } from "./components/Sidebar";
-import { TranscriptionsPage, ModelsPage, PermissionsPage, SettingsPage } from "./components/pages";
-import { FloatingRecorder } from "./components/features";
-import { Toaster } from "./components/ui";
-import { useHotkeyEvents } from "./hooks/useHotkeyEvents";
-import { AppConfigProvider } from "./contexts/AppConfigContext";
+import { useState } from 'react';
+import { Sidebar } from './components/Sidebar';
+import { AppHeader } from './components/layout';
+import {
+  DashboardPage,
+  TranscriptionsPage,
+  RuntimePage,
+  DictionaryPage,
+  PermissionsPage,
+  SettingsPage,
+} from './components/pages';
+import { Toaster } from './components/ui';
+import { useHotkeyEvents } from './hooks/useHotkeyEvents';
+import { AppConfigProvider } from './contexts/AppConfigContext';
+import { AppThemeProvider } from './contexts/ThemeProvider';
 
 const App = () => {
-  const [activeTab, setActiveTab] = useState("transcriptions");
+  const [activeTab, setActiveTab] = useState('dashboard');
 
-  // Initialize hotkey event listeners
   useHotkeyEvents();
 
   const renderContent = () => {
     switch (activeTab) {
-      case "transcriptions":
+      case 'dashboard':
+        return <DashboardPage />;
+      case 'transcriptions':
         return <TranscriptionsPage />;
-      case "models":
-        return <ModelsPage />;
-      case "permissions":
+      case 'runtimes':
+        return <RuntimePage />;
+      case 'dictionary':
+        return <DictionaryPage />;
+      case 'permissions':
         return <PermissionsPage />;
-      case "settings":
+      case 'settings':
         return <SettingsPage />;
       default:
-        return <TranscriptionsPage />;
+        return <DashboardPage />;
     }
   };
 
   return (
-    <AppConfigProvider>
-      <div className="flex h-screen bg-background p-6 gap-6">
-        {/* Sidebar */}
-        <div className="w-52 bg-surface-2 border border-border/50 rounded-2xl shadow-sm flex-shrink-0">
+    <AppThemeProvider>
+      <AppConfigProvider>
+        <div className="flex h-screen overflow-hidden bg-background">
           <Sidebar activeTab={activeTab} onTabChange={setActiveTab} />
+          <div className="flex-1 flex flex-col min-w-0">
+            <AppHeader activeTab={activeTab} />
+            <main className="flex-1 overflow-y-auto">{renderContent()}</main>
+          </div>
+          <Toaster />
         </div>
-        
-        {/* Main Content Area */}
-        <div className="flex-1 bg-surface-1 border border-border/50 rounded-2xl shadow-sm overflow-y-auto">
-          {renderContent()}
-        </div>
-        
-        {/* Floating Recorder */}
-        <FloatingRecorder />
-        
-        {/* Toast notifications */}
-        <Toaster />
-      </div>
-    </AppConfigProvider>
+      </AppConfigProvider>
+    </AppThemeProvider>
   );
 };
 
