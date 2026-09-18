@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import * as stylex from '@stylexjs/stylex';
 import { color, radius } from '@/styles/tokens.stylex';
 import { sx } from '@/components/ui-system/sx';
@@ -28,6 +28,16 @@ const styles = stylex.create({
     width: '100%',
     height: '100%',
   },
+  fallback: {
+    position: 'absolute',
+    inset: 24,
+    borderColor: color.copper,
+    borderStyle: 'solid',
+    borderWidth: 1,
+    borderRadius: '50%',
+    opacity: 0.55,
+    pointerEvents: 'none',
+  },
   caption: {
     position: 'absolute',
     left: 16,
@@ -56,6 +66,7 @@ export default function VoiceChamber({
 }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const handleRef = useRef<ChamberHandle | null>(null);
+  const [failed, setFailed] = useState(false);
   const reduced = usePrefersReducedMotion();
   const { resolvedTheme } = useAppTheme();
 
@@ -69,6 +80,7 @@ export default function VoiceChamber({
       });
     } catch {
       handleRef.current = null;
+      setFailed(true);
       return undefined;
     }
 
@@ -95,6 +107,7 @@ export default function VoiceChamber({
   return (
     <figure {...sx(styles.frame)} aria-label="Cámara de voz">
       <canvas ref={canvasRef} {...sx(styles.canvas)} />
+      {failed ? <div {...sx(styles.fallback)} aria-hidden /> : null}
       <figcaption {...sx(styles.caption)}>{captionFor(mode)}</figcaption>
     </figure>
   );

@@ -23,6 +23,7 @@ export default defineConfig(async () => ({
         type: 'commonJS',
         rootDir: __dirname,
       },
+      cssInjectionTarget: (fileName: string) => fileName.includes('globals'),
     }),
     tanstackRouter({
       target: 'react',

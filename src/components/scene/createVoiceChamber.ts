@@ -44,13 +44,14 @@ const FRAGMENT = /* glsl */ `
 
   void main() {
     float edge = smoothstep(0.98, 0.18, length(vUv - 0.5) * 1.85);
+    float oval = smoothstep(0.08, 0.0, abs(length((vUv - 0.5) * vec2(1.0, 1.25)) - 0.34));
     vec3 tone = mix(uCopper, uLive, uRecord);
-    vec3 color = mix(uInk, tone, 0.55 + vLift * 0.8);
+    vec3 color = mix(uInk, tone, 0.35 + vLift * 0.9);
     float gridX = abs(fract(vUv.x * 36.0) - 0.5);
     float gridY = abs(fract(vUv.y * 36.0) - 0.5);
     float wire = smoothstep(0.46, 0.02, min(gridX, gridY));
-    vec3 finalColor = mix(color, tone, wire * 0.55);
-    gl_FragColor = vec4(finalColor, edge * uFade);
+    vec3 finalColor = mix(color, tone, wire * 0.45 + oval * 0.65);
+    gl_FragColor = vec4(finalColor, max(edge * uFade, oval * 0.55));
   }
 `;
 

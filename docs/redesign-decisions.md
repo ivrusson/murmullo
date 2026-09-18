@@ -50,6 +50,10 @@ alimentan Tailwind, para que Select/Dialog/ComboBox no se vean de otro producto.
 **Archivos.** `vite.config.ts`, `src/styles/tokens.stylex.ts`,
 `src/components/ui-system/*`, `tailwind.config.ts`, `.eslintrc.cjs`.
 
+El unplugin, con dos HTML (app + overlay), inyectaba el CSS atómico en el chunk
+de la píldora. `cssInjectionTarget` apunta a `globals.css`, que cargan ambas
+ventanas.
+
 ---
 
 ## 3. Three.js: cámara de voz, no canvas muerto
