@@ -1,46 +1,39 @@
 :root {
-  --hud-bg: rgba(248, 250, 252, 0.92);
-  --hud-text: #1a2230;
-  --hud-muted: #64748b;
-  --hud-cyan: #0e7490;
-  --hud-amber: #c2410c;
-  --hud-indigo: #4f46e5;
-  --hud-error: #dc2626;
-  --hud-ok: #16a34a;
-  --hud-shadow:
-    0 16px 40px rgba(15, 23, 42, 0.16), inset 0 1px 1px rgba(255, 255, 255, 0.9);
-  --hud-inset:
-    inset 2px 2px 5px rgba(15, 23, 42, 0.08),
-    inset -1px -1px 2px rgba(255, 255, 255, 0.9);
-  --hud-chip-bg: rgba(241, 245, 249, 0.95);
-  --hud-sub-bg: rgba(255, 255, 255, 0.94);
-  --hud-key-bg: rgba(15, 23, 42, 0.06);
-  --hud-hint-bg: rgba(226, 232, 240, 0.95);
-  --hud-wave-bg: rgba(226, 232, 240, 0.9);
-  --font-ui: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --hud-bg: rgba(244, 242, 236, 0.94);
+  --hud-text: #1f2a36;
+  --hud-muted: #5c6b78;
+  --hud-cyan: #2f7d70;
+  --hud-amber: #b07a38;
+  --hud-indigo: #b07a38;
+  --hud-error: #b54b4b;
+  --hud-ok: #2f7d70;
+  --hud-shadow: 0 16px 40px rgba(31, 42, 54, 0.14);
+  --hud-inset: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  --hud-chip-bg: rgba(230, 232, 227, 0.95);
+  --hud-sub-bg: rgba(244, 242, 236, 0.96);
+  --hud-key-bg: rgba(31, 42, 54, 0.08);
+  --hud-hint-bg: rgba(230, 232, 227, 0.95);
+  --hud-wave-bg: rgba(230, 232, 227, 0.9);
+  --font-ui: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
 .dark {
-  --hud-bg: rgba(20, 25, 32, 0.92);
-  --hud-text: #e0e2ea;
-  --hud-muted: #94a3b8;
-  --hud-cyan: #4cd7f6;
-  --hud-amber: #ffb95f;
-  --hud-indigo: #c0c1ff;
-  --hud-error: #ffb4ab;
-  --hud-ok: #27c93f;
-  --hud-shadow:
-    0 20px 40px rgba(0, 0, 0, 0.7), inset 0 1px 1px rgba(255, 255, 255, 0.18),
-    inset 0 -2px 4px rgba(0, 0, 0, 0.8);
-  --hud-inset:
-    inset 2px 2px 5px rgba(0, 0, 0, 0.8),
-    inset -1px -1px 2px rgba(255, 255, 255, 0.04);
-  --hud-chip-bg: rgba(10, 15, 19, 0.9);
-  --hud-sub-bg: rgba(24, 28, 33, 0.95);
-  --hud-key-bg: rgba(255, 255, 255, 0.06);
-  --hud-hint-bg: rgba(38, 42, 48, 0.9);
-  --hud-wave-bg: rgba(10, 15, 19, 0.7);
+  --hud-bg: rgba(30, 44, 54, 0.94);
+  --hud-text: #e7e2d6;
+  --hud-muted: #8a97a3;
+  --hud-cyan: #4f9b8c;
+  --hud-amber: #c9955a;
+  --hud-indigo: #c9955a;
+  --hud-error: #d46a6a;
+  --hud-ok: #4f9b8c;
+  --hud-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
+  --hud-inset: inset 0 1px 0 rgba(231, 226, 214, 0.08);
+  --hud-chip-bg: rgba(22, 32, 40, 0.92);
+  --hud-sub-bg: rgba(22, 32, 40, 0.94);
+  --hud-key-bg: rgba(231, 226, 214, 0.08);
+  --hud-hint-bg: rgba(39, 56, 68, 0.92);
+  --hud-wave-bg: rgba(22, 32, 40, 0.72);
 }
 
 html,

@@ -1,12 +1,61 @@
 import { useEffect, useRef } from 'react';
+import * as stylex from '@stylexjs/stylex';
 import type { PipelineLogEntry } from '@/types';
 import { usePipelineLogs } from '@/hooks/usePipelineLogs';
+import { Surface } from '@/components/ui-system/Surface';
+import { color, font, radius, space } from '@/styles/tokens.stylex';
+import { sx } from '@/components/ui-system/sx';
 
-function stageClass(stage: string) {
-  if (stage === 'nemo' || stage === 'stt') return 'text-cyan';
-  if (stage === 'ptt') return 'text-foreground';
-  if (stage === 'audio') return 'text-amber';
-  return 'text-muted-foreground';
+const styles = stylex.create({
+  head: {
+    display: 'flex',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+    gap: space.md,
+    marginBottom: space.sm,
+  },
+  title: {
+    margin: 0,
+    color: color.copper,
+    fontSize: '0.8rem',
+  },
+  path: {
+    margin: 0,
+    color: color.muted,
+    fontFamily: font.mono,
+    fontSize: '0.7rem',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+  },
+  scroller: {
+    fontFamily: font.mono,
+    fontSize: '0.7rem',
+    lineHeight: 1.5,
+    overflowY: 'auto',
+    backgroundColor: color.raised,
+    borderRadius: radius.md,
+    padding: space.md,
+    color: color.ink,
+  },
+  compact: { maxHeight: 144 },
+  tall: { maxHeight: 256 },
+  line: {
+    display: 'flex',
+    gap: space.sm,
+    minWidth: 0,
+  },
+  muted: { color: color.muted, flexShrink: 0 },
+  live: { color: color.live, flexShrink: 0 },
+  copper: { color: color.copper, flexShrink: 0 },
+  msg: { wordBreak: 'break-all' },
+});
+
+function stageStyle(stage: string) {
+  if (stage === 'nemo' || stage === 'stt') return styles.live;
+  if (stage === 'ptt') return styles.copper;
+  if (stage === 'audio') return styles.copper;
+  return styles.muted;
 }
 
 function formatClock(ts: number) {
@@ -30,50 +79,37 @@ export function PipelineLogPanel({ compact = false }: { compact?: boolean }) {
   }, [logs]);
 
   return (
-    <section className="vf-card p-4 space-y-2">
-      <div className="flex items-baseline justify-between gap-3">
-        <div className="font-mono text-[10px] text-cyan uppercase tracking-wider">
-          Pipeline · nemo-speech
-        </div>
-        {path && (
-          <div
-            className="font-mono text-[10px] text-muted-foreground truncate"
-            title={path}
-          >
+    <Surface>
+      <div {...sx(styles.head)}>
+        <p {...sx(styles.title)}>Pipeline nemo-speech</p>
+        {path ? (
+          <p {...sx(styles.path)} title={path}>
             {path}
-          </div>
-        )}
+          </p>
+        ) : null}
       </div>
       <div
         ref={scroller}
-        className={`font-mono text-[11px] leading-relaxed overflow-y-auto vf-inset rounded-xl px-3 py-2 space-y-0.5 ${
-          compact ? 'max-h-36' : 'max-h-64'
-        }`}
+        {...sx(styles.scroller, compact ? styles.compact : styles.tall)}
       >
         {logs.length === 0 ? (
-          <div className="text-muted-foreground">
-            Esperando eventos del STT…
-          </div>
+          <div {...sx(styles.muted)}>Esperando eventos del STT…</div>
         ) : (
           logs.map((entry, i) => (
             <LogLine key={`${entry.ts}-${entry.stage}-${i}`} entry={entry} />
           ))
         )}
       </div>
-    </section>
+    </Surface>
   );
 }
 
 function LogLine({ entry }: { entry: PipelineLogEntry }) {
   return (
-    <div className="flex gap-2 min-w-0">
-      <span className="text-muted-foreground shrink-0">
-        {formatClock(entry.ts)}
-      </span>
-      <span className={`shrink-0 uppercase ${stageClass(entry.stage)}`}>
-        {entry.stage}
-      </span>
-      <span className="text-foreground/90 break-all">{entry.message}</span>
+    <div {...sx(styles.line)}>
+      <span {...sx(styles.muted)}>{formatClock(entry.ts)}</span>
+      <span {...sx(stageStyle(entry.stage))}>{entry.stage}</span>
+      <span {...sx(styles.msg)}>{entry.message}</span>
     </div>
   );
 }

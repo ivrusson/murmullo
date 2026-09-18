@@ -50,13 +50,18 @@ export const AppConfigProvider: React.FC<{ children: ReactNode }> = ({
     const load = async () => {
       try {
         setIsLoading(true);
-        await refreshConfig();
-        const devices = await audioService.listDevices();
+        const [appConfig, devices, status] = await Promise.all([
+          configService.getConfig(),
+          audioService.listDevices(),
+          runtimeService.status(),
+        ]);
+        setConfig(appConfig);
+        setSelectedLanguage(appConfig.runtime?.default_language || 'auto');
         setAudioDevices(devices);
         if (devices.length > 0) {
           setSelectedDevice(devices[0].id);
         }
-        setRuntimeStatus(await runtimeService.status());
+        setRuntimeStatus(status);
       } catch (error) {
         console.error('Error loading configuration:', error);
       } finally {
@@ -64,7 +69,7 @@ export const AppConfigProvider: React.FC<{ children: ReactNode }> = ({
       }
     };
     load();
-  }, [refreshConfig]);
+  }, []);
 
   useEffect(() => {
     const unlisten = listen('hotkeys-updated', () => {

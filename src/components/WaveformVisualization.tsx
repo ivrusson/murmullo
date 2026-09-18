@@ -36,9 +36,8 @@ export const WaveformVisualization: React.FC<WaveformVisualizationProps> = ({
             x2="100%"
             y2="100%"
           >
-            <stop offset="0%" stopColor="#6366F1" />
-            <stop offset="55%" stopColor="#4CD7F6" />
-            <stop offset="100%" stopColor="#FFB95F" />
+            <stop offset="0%" stopColor="#C9955A" />
+            <stop offset="100%" stopColor="#4F9B8C" />
           </linearGradient>
         </defs>
         {barHeights.map((height, index) => (

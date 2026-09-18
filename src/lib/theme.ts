@@ -7,8 +7,8 @@ export const THEME_OPTIONS: ReadonlyArray<{
   label: string;
   hint: string;
 }> = [
-  { value: 'light', label: 'Claro', hint: 'Fondos claros y texto oscuro' },
-  { value: 'dark', label: 'Oscuro', hint: 'El tema Velvet Flow original' },
+  { value: 'light', label: 'Claro', hint: 'Lienzo frío de cabina' },
+  { value: 'dark', label: 'Oscuro', hint: 'Sala de grabación Booth' },
   { value: 'system', label: 'Sistema', hint: 'Sigue el modo de macOS' },
 ];
 

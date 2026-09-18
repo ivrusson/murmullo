@@ -6,60 +6,60 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        border: 'hsl(var(--border))',
-        input: 'hsl(var(--input))',
-        ring: 'hsl(var(--ring))',
-        background: 'hsl(var(--background))',
-        foreground: 'hsl(var(--foreground))',
+        border: 'var(--border)',
+        input: 'var(--input)',
+        ring: 'var(--ring)',
+        background: 'var(--background)',
+        foreground: 'var(--foreground)',
         primary: {
-          DEFAULT: 'hsl(var(--primary))',
-          foreground: 'hsl(var(--primary-foreground))',
+          DEFAULT: 'var(--primary)',
+          foreground: 'var(--primary-foreground)',
         },
         secondary: {
-          DEFAULT: 'hsl(var(--secondary))',
-          foreground: 'hsl(var(--secondary-foreground))',
+          DEFAULT: 'var(--secondary)',
+          foreground: 'var(--secondary-foreground)',
         },
         destructive: {
-          DEFAULT: 'hsl(var(--destructive))',
-          foreground: 'hsl(var(--destructive-foreground))',
+          DEFAULT: 'var(--destructive)',
+          foreground: 'var(--destructive-foreground)',
         },
         success: {
-          DEFAULT: 'hsl(var(--success))',
-          foreground: 'hsl(var(--success-foreground))',
+          DEFAULT: 'var(--success)',
+          foreground: 'var(--success-foreground)',
         },
         warning: {
-          DEFAULT: 'hsl(var(--warning))',
-          foreground: 'hsl(var(--warning-foreground))',
+          DEFAULT: 'var(--warning)',
+          foreground: 'var(--warning-foreground)',
         },
         muted: {
-          DEFAULT: 'hsl(var(--muted))',
-          foreground: 'hsl(var(--muted-foreground))',
+          DEFAULT: 'var(--muted)',
+          foreground: 'var(--muted-foreground)',
         },
         accent: {
-          DEFAULT: 'hsl(var(--accent))',
-          foreground: 'hsl(var(--accent-foreground))',
+          DEFAULT: 'var(--accent)',
+          foreground: 'var(--accent-foreground)',
         },
         popover: {
-          DEFAULT: 'hsl(var(--popover))',
-          foreground: 'hsl(var(--popover-foreground))',
+          DEFAULT: 'var(--popover)',
+          foreground: 'var(--popover-foreground)',
         },
         card: {
-          DEFAULT: 'hsl(var(--card))',
-          foreground: 'hsl(var(--card-foreground))',
+          DEFAULT: 'var(--card)',
+          foreground: 'var(--card-foreground)',
         },
         surface: {
-          1: 'hsl(var(--surface-1))',
-          2: 'hsl(var(--surface-2))',
-          3: 'hsl(var(--surface-3))',
-          4: 'hsl(var(--surface-4))',
+          1: 'var(--surface-1)',
+          2: 'var(--surface-2)',
+          3: 'var(--surface-3)',
+          4: 'var(--surface-4)',
         },
         cyan: {
-          DEFAULT: 'hsl(var(--cyan))',
-          foreground: 'hsl(var(--cyan-foreground))',
+          DEFAULT: 'var(--cyan)',
+          foreground: 'var(--cyan-foreground)',
         },
         amber: {
-          DEFAULT: 'hsl(var(--amber))',
-          foreground: 'hsl(var(--amber-foreground))',
+          DEFAULT: 'var(--amber)',
+          foreground: 'var(--amber-foreground)',
         },
       },
       borderRadius: {
@@ -71,6 +71,7 @@ const config: Config = {
       },
       fontFamily: {
         sans: ['var(--font-family)', 'system-ui', 'sans-serif'],
+        display: ['var(--font-display)', 'Georgia', 'serif'],
         mono: ['var(--font-mono)', 'ui-monospace', 'monospace'],
       },
       fontSize: {
@@ -89,16 +90,6 @@ const config: Config = {
         lg: 'var(--spacing-lg)',
         xl: 'var(--spacing-xl)',
         '2xl': 'var(--spacing-2xl)',
-      },
-      boxShadow: {
-        sm: 'var(--shadow-sm)',
-        md: 'var(--shadow-md)',
-        lg: 'var(--shadow-lg)',
-        xl: 'var(--shadow-xl)',
-        sidebar: 'var(--shadow-sidebar)',
-        header: 'var(--shadow-header)',
-        'nav-active': 'var(--shadow-nav-active)',
-        'chip-inset': 'var(--shadow-chip-inset)',
       },
       transitionDuration: {
         fast: 'var(--transition-fast)',

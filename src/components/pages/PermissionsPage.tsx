@@ -1,7 +1,4 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Container, Section, Flex } from '@/components/layout';
-import { Button, Badge } from '@/components/ui';
-import { Heading, Text, Icon } from '@/components/ui';
 import {
   Shield,
   CheckCircle,
@@ -11,14 +8,74 @@ import {
   Settings,
   RefreshCw,
 } from 'lucide-react';
+import * as stylex from '@stylexjs/stylex';
 import { permissionService } from '@/services/tauri';
 import type { MacosPermissionStatus } from '@/types';
+import { PageFrame } from '@/components/ui-system/PageFrame';
+import { PageHeader } from '@/components/ui-system/PageHeader';
+import { Surface } from '@/components/ui-system/Surface';
+import { BoothButton } from '@/components/ui-system/BoothButton';
+import { Chip } from '@/components/ui-system/Chip';
+import { color, radius, space } from '@/styles/tokens.stylex';
+import { sx } from '@/components/ui-system/sx';
 
 const EMPTY_STATUS: MacosPermissionStatus = {
   microphone: false,
   accessibility: false,
   input_monitoring: false,
 };
+
+const styles = stylex.create({
+  banner: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: space.sm,
+    padding: space.md,
+    borderRadius: radius.md,
+  },
+  ok: {
+    backgroundColor: 'color-mix(in srgb, var(--booth-live) 16%, transparent)',
+    color: color.live,
+  },
+  bad: {
+    backgroundColor: 'color-mix(in srgb, var(--booth-danger) 16%, transparent)',
+    color: color.danger,
+  },
+  row: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    gap: space.md,
+    padding: space.md,
+    borderRadius: radius.md,
+    backgroundColor: color.raised,
+    marginBottom: space.sm,
+    flexDirection: {
+      default: 'row',
+      '@media (max-width: 720px)': 'column',
+    },
+    alignItems: {
+      default: 'center',
+      '@media (max-width: 720px)': 'flex-start',
+    },
+  },
+  copy: {
+    margin: 0,
+    color: color.muted,
+    fontSize: '0.8rem',
+    lineHeight: 1.5,
+    maxWidth: '36rem',
+  },
+  title: {
+    margin: 0,
+    fontWeight: 600,
+  },
+  steps: {
+    color: color.muted,
+    fontSize: '0.85rem',
+    lineHeight: 1.7,
+    paddingLeft: space.lg,
+  },
+});
 
 export function PermissionsPage() {
   const [status, setStatus] = useState<MacosPermissionStatus>(EMPTY_STATUS);
@@ -102,127 +159,69 @@ export function PermissionsPage() {
   const allGranted = permissions.every(p => p.value);
 
   return (
-    <div className="min-h-full px-6 py-6">
-      <Container size="lg" padding="sm">
-        <Section spacing="md">
-          <Flex direction="column" gap="xs" className="mb-4">
-            <Flex align="center" gap="sm">
-              <Icon icon={Shield} size="lg" color="primary" />
-              <Heading level={1} size="xl" className="font-semibold">
-                Permisos de sistema
-              </Heading>
-            </Flex>
-            <Text color="muted" size="sm" className="font-light">
-              Micrófono, atajo y pegado son APIs de macOS. Murmullo no escucha
-              teclas ni audio desde su propia UI.
-            </Text>
-          </Flex>
+    <PageFrame>
+      <PageHeader
+        title="Permisos de sistema"
+        lede="Micrófono, atajo y pegado son APIs de macOS. Murmullo no escucha teclas ni audio desde su propia UI."
+        actions={
+          <BoothButton
+            tone="quiet"
+            size="sm"
+            onClick={() => void loadPermissions()}
+          >
+            <RefreshCw size={14} /> Actualizar
+          </BoothButton>
+        }
+      />
 
-          <div className="mb-4">
-            <Button
-              onClick={() => loadPermissions()}
-              size="sm"
-              variant="outline"
-              className="text-xs px-3 py-1"
-            >
-              <Icon icon={RefreshCw} size="sm" />
-              Actualizar
-            </Button>
-          </div>
+      <div {...sx(styles.banner, allGranted ? styles.ok : styles.bad)}>
+        {allGranted ? <CheckCircle size={16} /> : <AlertCircle size={16} />}
+        {allGranted
+          ? 'El dictado puede operar en segundo plano'
+          : 'Faltan permisos de sistema para el comando global'}
+      </div>
 
-          <div className="mb-4">
-            <div
-              className={`p-3 rounded-lg ${allGranted ? 'bg-success/10' : 'bg-destructive/10'}`}
-            >
-              <Flex align="center" gap="sm">
-                <Icon
-                  icon={allGranted ? CheckCircle : AlertCircle}
+      {error ? <p {...sx(styles.copy)}>{error}</p> : null}
+
+      {permissions.map(permission => {
+        const Icon = permission.icon;
+        return (
+          <div key={permission.key} {...sx(styles.row)}>
+            <div>
+              <p {...sx(styles.title)}>
+                <Icon size={14} aria-hidden /> {permission.label}
+              </p>
+              <p {...sx(styles.copy)}>{permission.description}</p>
+            </div>
+            <div>
+              <Chip tone={permission.value ? 'live' : 'danger'}>
+                {permission.value ? 'Concedido' : 'Necesario'}
+              </Chip>
+              {permission.value ? null : (
+                <BoothButton
                   size="sm"
-                  color={allGranted ? 'success' : 'destructive'}
-                />
-                <Text
-                  weight="medium"
-                  className={`text-sm ${allGranted ? 'text-success' : 'text-destructive'}`}
+                  onClick={() => void permission.request()}
+                  disabled={busy !== null}
                 >
-                  {allGranted
-                    ? 'El dictado puede operar en segundo plano'
-                    : 'Faltan permisos de sistema para el comando global'}
-                </Text>
-              </Flex>
+                  {busy === permission.key ? 'Pidiendo…' : 'Conceder'}
+                </BoothButton>
+              )}
             </div>
           </div>
+        );
+      })}
 
-          {error && (
-            <div className="mb-4 p-3 rounded-lg bg-destructive/10">
-              <Text size="xs" className="text-destructive break-all">
-                {error}
-              </Text>
-            </div>
-          )}
-
-          <div className="space-y-2">
-            {permissions.map(permission => (
-              <div
-                key={permission.key}
-                className="flex justify-between items-center py-3 px-3 bg-surface-2 rounded-lg hover:bg-surface-3 transition-colors"
-              >
-                <Flex align="center" gap="sm">
-                  <Icon icon={permission.icon} size="sm" color="primary" />
-                  <Flex direction="column" gap="xs">
-                    <Text weight="medium" className="text-foreground text-sm">
-                      {permission.label}
-                    </Text>
-                    <Text
-                      size="xs"
-                      color="muted"
-                      className="font-light max-w-xl"
-                    >
-                      {permission.description}
-                    </Text>
-                  </Flex>
-                </Flex>
-                <Flex align="center" gap="md">
-                  <Badge
-                    variant={permission.value ? 'secondary' : 'destructive'}
-                    className={
-                      permission.value
-                        ? 'bg-success/10 text-success border-success/20 text-xs'
-                        : 'bg-destructive/10 text-destructive border-destructive/20 text-xs'
-                    }
-                  >
-                    {permission.value ? 'Concedido' : 'Necesario'}
-                  </Badge>
-                  {!permission.value && (
-                    <Button
-                      onClick={permission.request}
-                      size="sm"
-                      disabled={busy !== null}
-                      className="text-xs px-4 py-1"
-                    >
-                      {busy === permission.key ? '…' : 'Conceder'}
-                    </Button>
-                  )}
-                </Flex>
-              </div>
-            ))}
-          </div>
-
-          <div className="mt-6">
-            <Flex align="center" gap="sm" className="mb-3">
-              <Icon icon={AlertCircle} size="sm" color="primary" />
-              <Text weight="medium" className="text-foreground text-sm">
-                Cómo concederlos
-              </Text>
-            </Flex>
-            <div className="space-y-1 text-xs text-muted-foreground font-light pl-6">
-              <div>1. Ajustes del Sistema → Privacidad y seguridad</div>
-              <div>2. Micrófono, Monitorización de entrada y Accesibilidad</div>
-              <div>3. Activa Murmullo (o el binario de `tauri dev`)</div>
-              <div>4. Vuelve aquí: el estado se actualiza solo</div>
-            </div>
-          </div>
-        </Section>
-      </Container>
-    </div>
+      <Surface>
+        <p {...sx(styles.title)}>
+          <Shield size={14} aria-hidden /> Cómo concederlos
+        </p>
+        <ol {...sx(styles.steps)}>
+          <li>Ajustes del Sistema, Privacidad y seguridad</li>
+          <li>Micrófono, Monitorización de entrada y Accesibilidad</li>
+          <li>Activa Murmullo (o el binario de `tauri dev`)</li>
+          <li>Vuelve aquí: el estado se actualiza solo</li>
+        </ol>
+      </Surface>
+    </PageFrame>
   );
 }
