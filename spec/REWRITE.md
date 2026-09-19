@@ -1,63 +1,73 @@
-# Murmullo como wrapper de escritorio (Wispr Flow)
+# Murmullo as a desktop wrapper
 
-Punto de partida del rewrite. Murmullo no es un motor de inferencia: es la capa de escritorio que
-orquesta STT y LLM locales.
+Murmullo is not an inference engine. It is the desktop layer that orchestrates local STT and an
+optional local LLM.
 
-## Tesis
+## Thesis
 
 1. **STT** — [NeMo-Speech.cpp](https://github.com/NVIDIA/NeMo-Speech.cpp) +
-   `parakeet-tdt-0.6b-v3.q8_0.gguf` (~714 MB, Metal en Apple Silicon).
-2. **LLM** — runtime HTTP local (Ollama por defecto) con un **system prompt** y un **diccionario**
-   que se actualizan cuando el usuario corrige.
+   `parakeet-tdt-0.6b-v3.q8_0.gguf` (~714 MB, Metal on Apple Silicon).
+2. **LLM** — local HTTP runtime (Ollama by default) with a **system prompt** and a **dictionary**
+   that update when the user corrects.
 
-Comportamiento objetivo (Wispr Flow):
+Target behaviour:
 
-- La app vive en **background** (tray).
-- Al arrancar, **levanta el servidor** STT (y el LLM si está disponible).
-- Un hotkey **graba**, obtiene texto, lo **corrige** con diccionario/LLM y lo **pega** en el campo
-  activo.
-- Hay **historial**, **overlay** (placeholder) y **diccionario que aprende**.
+- The app lives in the **background** (tray).
+- On launch it **starts the STT server** (and the LLM if available).
+- A system hotkey **records**, gets text, **corrects** it with dictionary/LLM, and **pastes** into
+  the focused field.
+- There is **history**, an **always-on-top overlay**, and a **dictionary that learns**.
 
-Parakeet TDT v3 es **offline** (no streaming). El flujo es hold-to-talk: pulsar → hablar → soltar →
-transcribir → pegar.
+Parakeet TDT v3 is **offline** (not streaming). The flow is hold-to-talk: press → speak → release →
+transcribe → paste.
 
-El aprendizaje **no** vive en el STT. Parakeet no se fine-tunea. El diccionario y el prompt son la
-capa que se corrige sola.
+Learning does **not** live in the STT. Parakeet is not fine-tuned. The dictionary and prompt are the
+layer that corrects itself.
+
+**Supported today:** macOS (capture, hotkey, paste). Windows/Linux paste is pending.
 
 ## Pipeline
 
 ```
 Hotkey / overlay
-  → captura 16 kHz
-  → gate de voz
+  → 16 kHz capture
+  → speech gate
   → POST /v1/audio/transcriptions (nemo-speech)
-  → PostProcessor (diccionario, luego LLM si está listo)
-  → pegar en la app activa
-  → historial (raw + final)
+  → PostProcessor (dictionary, then LLM if ready)
+  → paste into the focused app (macOS)
+  → history (raw + final)
 ```
+
+The overlay (`floating-bar`) is a HUD: idle shows the real hotkey, recording / processing / done /
+error, plus Grabar / Parar / Cancelar. The system hotkey remains the primary trigger.
 
 ## Runtimes
 
-| Pieza            | Cómo                                                                                        |
-| ---------------- | ------------------------------------------------------------------------------------------- |
-| `nemo-speech`    | PATH o `NEMO_SPEECH_BIN`. `serve --host 127.0.0.1 --port 18765 --no-ui`                     |
-| GGUF Parakeet Q8 | `~/Library/Application Support/murmullo/models/` (u homólogo)                               |
-| LLM              | HTTP compatible con Ollama (`127.0.0.1:11434`). Opcional: si falla, se pega STT+diccionario |
+| Piece            | How                                                                                      |
+| ---------------- | ---------------------------------------------------------------------------------------- |
+| `nemo-speech`    | PATH or `NEMO_SPEECH_BIN`. `serve --host 127.0.0.1 --port 18765 --no-ui`                 |
+| Parakeet Q8 GGUF | `~/Library/Application Support/murmullo/models/`                                         |
+| LLM              | Ollama-compatible HTTP (`127.0.0.1:11434`). Optional: on failure, paste STT + dictionary |
 
-## Fuera de alcance
+## Workstation pages
 
-- Fine-tune de Parakeet
+Inicio, Historial, Diccionario, Runtimes, Permisos, Ajustes. See
+[../src/lib/nav.ts](../src/lib/nav.ts).
+
+## Out of scope (now)
+
+- Fine-tune of Parakeet
 - Streaming / `--live`
-- Cloud STT / cloud LLM como dependencia
-- Rediseño visual de la barrita (solo se enganchan estados)
+- Cloud STT / cloud LLM as a dependency
+- Paste into the focused app on Windows and Linux (declared pending)
 
-## Criterio de éxito
+## Success
 
-Un usuario tiene (o instala) nemo-speech, abre Murmullo, la app queda en segundo plano, pulsa el
-atajo, habla, suelta, y el texto corregido aparece en Slack/Cursor/Notes. Puede abrir historial y
-añadir términos al diccionario.
+A user has (or installs) nemo-speech, opens Murmullo, the app stays in the background, holds the
+hotkey, speaks, releases, and the corrected text appears in Slack / Cursor / Notes. They can open
+history and add dictionary terms.
 
-## Decisiones
+## Decisions
 
-El detalle de porqués (atajo nativo, reutilizar nemo-speech, gate permisivo, logs, LLM opcional,
-pegado en el hilo principal) está en [DECISIONS.md](./DECISIONS.md).
+Whys (native hotkey, reuse nemo-speech, permissive gate, logs, optional LLM, paste on the main
+thread, StyleX, hash router) live in [DECISIONS.md](./DECISIONS.md).

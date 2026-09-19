@@ -5,6 +5,7 @@ import { usePipelineLogs } from '@/hooks/usePipelineLogs';
 import { Surface } from '@/components/ui-system/Surface';
 import { color, font, radius, space } from '@/styles/tokens.stylex';
 import { sx } from '@/components/ui-system/sx';
+import { useT, intlLocale, getLocale } from '@/i18n';
 
 const styles = stylex.create({
   head: {
@@ -16,8 +17,10 @@ const styles = stylex.create({
   },
   title: {
     margin: 0,
-    color: color.copper,
-    fontSize: '0.8rem',
+    color: color.iris,
+    fontFamily: font.sans,
+    fontSize: 13,
+    fontWeight: 600,
   },
   path: {
     margin: 0,
@@ -46,21 +49,21 @@ const styles = stylex.create({
     minWidth: 0,
   },
   muted: { color: color.muted, flexShrink: 0 },
-  live: { color: color.live, flexShrink: 0 },
-  copper: { color: color.copper, flexShrink: 0 },
+  live: { color: color.sage, flexShrink: 0 },
+  iris: { color: color.iris, flexShrink: 0 },
   msg: { wordBreak: 'break-all' },
 });
 
 function stageStyle(stage: string) {
   if (stage === 'nemo' || stage === 'stt') return styles.live;
-  if (stage === 'ptt') return styles.copper;
-  if (stage === 'audio') return styles.copper;
+  if (stage === 'ptt') return styles.iris;
+  if (stage === 'audio') return styles.iris;
   return styles.muted;
 }
 
 function formatClock(ts: number) {
   const d = new Date(ts);
-  return d.toLocaleTimeString('es-ES', {
+  return d.toLocaleTimeString(intlLocale(getLocale()), {
     hour: '2-digit',
     minute: '2-digit',
     second: '2-digit',
@@ -68,6 +71,7 @@ function formatClock(ts: number) {
 }
 
 export function PipelineLogPanel({ compact = false }: { compact?: boolean }) {
+  const t = useT();
   const { logs, path } = usePipelineLogs(compact ? 8 : 200);
   const scroller = useRef<HTMLDivElement>(null);
 
@@ -81,7 +85,7 @@ export function PipelineLogPanel({ compact = false }: { compact?: boolean }) {
   return (
     <Surface>
       <div {...sx(styles.head)}>
-        <p {...sx(styles.title)}>Pipeline nemo-speech</p>
+        <p {...sx(styles.title)}>{t('runtime.pipelineTitle')}</p>
         {path ? (
           <p {...sx(styles.path)} title={path}>
             {path}
@@ -93,7 +97,7 @@ export function PipelineLogPanel({ compact = false }: { compact?: boolean }) {
         {...sx(styles.scroller, compact ? styles.compact : styles.tall)}
       >
         {logs.length === 0 ? (
-          <div {...sx(styles.muted)}>Esperando eventos del STT…</div>
+          <div {...sx(styles.muted)}>{t('runtime.pipelineEmpty')}</div>
         ) : (
           logs.map((entry, i) => (
             <LogLine key={`${entry.ts}-${entry.stage}-${i}`} entry={entry} />

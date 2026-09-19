@@ -1,6 +1,5 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
-import tailwindcss from '@tailwindcss/vite';
 import stylex from '@stylexjs/unplugin';
 import tanstackRouter from '@tanstack/router-plugin/vite';
 import path from 'path';
@@ -10,7 +9,7 @@ const host = process.env.TAURI_DEV_HOST;
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-export default defineConfig(async () => ({
+export default defineConfig({
   plugins: [
     stylex.vite({
       useCSSLayers: true,
@@ -33,7 +32,6 @@ export default defineConfig(async () => ({
       quoteStyle: 'single',
       semicolons: true,
     }),
-    tailwindcss(),
     react(),
   ],
   resolve: {
@@ -41,11 +39,17 @@ export default defineConfig(async () => ({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  optimizeDeps: {
+    // Avoid a StyleX/Vite crawl deadlock that never commits `.vite/deps`.
+    holdUntilCrawlEnd: false,
+    exclude: ['@tauri-apps/api'],
+  },
   build: {
     rollupOptions: {
       input: {
         main: path.resolve(__dirname, 'index.html'),
         floatingBar: path.resolve(__dirname, 'floating-bar.html'),
+        crashReporter: path.resolve(__dirname, 'crash.html'),
       },
     },
   },
@@ -66,4 +70,4 @@ export default defineConfig(async () => ({
       include: ['src/**/*'],
     },
   },
-}));
+});

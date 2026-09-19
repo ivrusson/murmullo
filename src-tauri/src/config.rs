@@ -1,7 +1,6 @@
 use serde::{Deserialize, Serialize};
-use std::env;
 use std::fs;
-use std::path::Path;
+use std::path::PathBuf;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppConfig {
@@ -22,6 +21,8 @@ pub struct RuntimeConfig {
     pub llm_url: String,
     #[serde(default = "default_llm_model")]
     pub llm_model: String,
+    #[serde(default = "default_llm_provider")]
+    pub llm_provider: String,
     #[serde(default = "default_true")]
     pub llm_enabled: bool,
     pub default_language: Option<String>,
@@ -36,6 +37,9 @@ fn default_llm_url() -> String {
 fn default_llm_model() -> String {
     "llama3.2".to_string()
 }
+fn default_llm_provider() -> String {
+    "ollama".to_string()
+}
 fn default_true() -> bool {
     true
 }
@@ -46,6 +50,7 @@ impl Default for RuntimeConfig {
             stt_port: default_stt_port(),
             llm_url: default_llm_url(),
             llm_model: default_llm_model(),
+            llm_provider: default_llm_provider(),
             llm_enabled: true,
             default_language: None,
         }
@@ -112,6 +117,14 @@ pub struct UiConfig {
     #[serde(default = "default_true")]
     pub auto_save_transcriptions: bool,
     pub selected_model: Option<String>,
+    #[serde(default)]
+    pub overlay_x: Option<f64>,
+    #[serde(default)]
+    pub overlay_y: Option<f64>,
+    #[serde(default)]
+    pub overlay_compact: bool,
+    #[serde(default = "default_overlay_style")]
+    pub overlay_style: String,
 }
 
 impl Default for UiConfig {
@@ -122,15 +135,30 @@ impl Default for UiConfig {
             show_debug_info: false,
             auto_save_transcriptions: true,
             selected_model: None,
+            overlay_x: None,
+            overlay_y: None,
+            overlay_compact: false,
+            overlay_style: default_overlay_style(),
         }
     }
 }
 
 fn default_theme() -> String {
-    "dark".to_string()
+    "light".to_string()
 }
 fn default_ui_lang() -> String {
     "es".to_string()
+}
+
+fn default_overlay_style() -> String {
+    "pill".to_string()
+}
+
+pub fn normalize_overlay_style(value: &str) -> String {
+    match value {
+        "island" | "card" | "pill" => value.to_string(),
+        _ => default_overlay_style(),
+    }
 }
 
 impl Default for AppConfig {
@@ -145,31 +173,29 @@ impl Default for AppConfig {
                 show_debug_info: false,
                 auto_save_transcriptions: true,
                 selected_model: Some("parakeet-tdt-0.6b-v3-q8".to_string()),
+                overlay_x: None,
+                overlay_y: None,
+                overlay_compact: false,
+                overlay_style: default_overlay_style(),
             },
         }
     }
 }
 
 impl AppConfig {
-    fn get_config_path() -> String {
-        if let Ok(home_dir) = env::var("HOME") {
-            let config_dir = format!("{}/.config/murmullo", home_dir);
-            if fs::create_dir_all(&config_dir).is_err() {
-                return "config.json".to_string();
-            }
-            return format!("{}/config.json", config_dir);
-        }
-        "config.json".to_string()
+    fn get_config_path() -> PathBuf {
+        crate::paths::ensure_layout();
+        crate::paths::config_file()
     }
 
     pub fn load() -> Result<Self, Box<dyn std::error::Error>> {
         let config_path = Self::get_config_path();
 
-        if Path::new(&config_path).exists() {
+        if config_path.exists() {
             let content = fs::read_to_string(&config_path)?;
             match serde_json::from_str::<AppConfig>(&content) {
                 Ok(config) => {
-                    println!("📁 Config loaded from {}", config_path);
+                    println!("📁 Config loaded from {}", config_path.display());
                     Ok(config)
                 }
                 Err(e) => {
@@ -191,7 +217,7 @@ impl AppConfig {
         let config_path = Self::get_config_path();
         let content = serde_json::to_string_pretty(self)?;
         fs::write(&config_path, content)?;
-        println!("💾 Config saved to {}", config_path);
+        println!("💾 Config saved to {}", config_path.display());
         Ok(())
     }
 
@@ -209,11 +235,17 @@ impl AppConfig {
     pub fn update_runtime_config(
         &mut self,
         llm_enabled: bool,
+        llm_provider: String,
         llm_model: String,
         default_language: Option<String>,
     ) {
         self.runtime.llm_enabled = llm_enabled;
-        self.runtime.llm_model = llm_model;
+        self.runtime.llm_provider = crate::llm::normalize_provider(&llm_provider);
+        self.runtime.llm_model = if llm_model.trim().is_empty() {
+            crate::llm::default_model_for(&self.runtime.llm_provider).to_string()
+        } else {
+            llm_model
+        };
         self.runtime.default_language = default_language;
     }
 
@@ -226,6 +258,23 @@ impl AppConfig {
 
     pub fn update_theme(&mut self, theme: String) {
         self.ui.theme = theme;
+    }
+
+    pub fn update_language(&mut self, language: String) {
+        self.ui.language = language;
+    }
+
+    pub fn update_overlay_position(&mut self, x: f64, y: f64) {
+        self.ui.overlay_x = Some(x);
+        self.ui.overlay_y = Some(y);
+    }
+
+    pub fn update_overlay_compact(&mut self, compact: bool) {
+        self.ui.overlay_compact = compact;
+    }
+
+    pub fn update_overlay_style(&mut self, style: String) {
+        self.ui.overlay_style = normalize_overlay_style(&style);
     }
 
     pub fn update_selected_model(&mut self, model_name: Option<String>) {

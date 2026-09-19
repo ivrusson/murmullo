@@ -1,0 +1,53 @@
+name: Feature Request
+description: Suggest an improvement for Murmullo
+title: '[Feature]: '
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Describe the gap from the user's point of view. Screenshots or mockups can go in Additional context.
+  - type: textarea
+    id: description
+    attributes:
+      label: Problem and proposed solution
+      description: What is missing, and how should it work?
+      placeholder: I want to pause dictation without cancelling the clip.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: How it should work
+      description: Optional walkthrough from the user's perspective.
+    validations:
+      required: false
+  - type: textarea
+    id: expected
+    attributes:
+      label: Why this helps
+      description: Optional. What becomes easier if this exists?
+    validations:
+      required: false
+  - type: textarea
+    id: actual
+    attributes:
+      label: Alternatives considered
+      description: Optional. Workarounds or other approaches.
+    validations:
+      required: false
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Filled by the app when you report from Murmullo.
+      render: shell
+    validations:
+      required: false
+  - type: textarea
+    id: stack
+    attributes:
+      label: Additional context
+      description: Optional mockups, references, or extra notes.
+    validations:
+      required: false

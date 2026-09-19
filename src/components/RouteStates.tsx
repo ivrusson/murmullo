@@ -1,9 +1,12 @@
+import { useState } from 'react';
 import { Link } from '@tanstack/react-router';
 import * as stylex from '@stylexjs/stylex';
 import { color, font, space } from '@/styles/tokens.stylex';
 import { sx } from '@/components/ui-system/sx';
 import { PageFrame } from '@/components/ui-system/PageFrame';
-import { BoothButton } from '@/components/ui-system/BoothButton';
+import { Button } from '@/components/ui-system/Button';
+import { FeedbackDialog } from '@/components/FeedbackDialog';
+import { useT } from '@/i18n';
 
 const styles = stylex.create({
   title: {
@@ -32,15 +35,14 @@ const styles = stylex.create({
 });
 
 export function NotFound() {
+  const t = useT();
   return (
     <PageFrame>
-      <h1 {...sx(styles.title)}>Esta vista no existe</h1>
-      <p {...sx(styles.copy)}>
-        Elige una sección del menú o vuelve al escritorio para dictar.
-      </p>
+      <h1 {...sx(styles.title)}>{t('route.notFoundTitle')}</h1>
+      <p {...sx(styles.copy)}>{t('route.notFoundBody')}</p>
       <div {...sx(styles.actions)}>
         <Link to="/" preload="intent">
-          <BoothButton>Ir al escritorio</BoothButton>
+          <Button>{t('route.goHome')}</Button>
         </Link>
       </div>
     </PageFrame>
@@ -48,21 +50,30 @@ export function NotFound() {
 }
 
 export function RouteError({ error }: { error: Error }) {
+  const t = useT();
+  const [open, setOpen] = useState(false);
   return (
     <PageFrame>
-      <h1 {...sx(styles.title)}>Esta vista se rompió</h1>
-      <p {...sx(styles.copy)}>
-        Recarga la ventana o vuelve al escritorio. El dictado por atajo sigue
-        funcionando en segundo plano.
-      </p>
+      <h1 {...sx(styles.title)}>{t('route.errorTitle')}</h1>
+      <p {...sx(styles.copy)}>{t('route.errorBody')}</p>
       <div {...sx(styles.actions)}>
         <Link to="/" preload="intent">
-          <BoothButton>Ir al escritorio</BoothButton>
+          <Button>{t('route.goHome')}</Button>
         </Link>
+        <Button tone="quiet" onClick={() => setOpen(true)}>
+          {t('feedback.reportThisError')}
+        </Button>
       </div>
-      {error.message ? (
-        <pre {...sx(styles.pre)}>{error.message}</pre>
-      ) : null}
+      {error.message ? <pre {...sx(styles.pre)}>{error.message}</pre> : null}
+      <FeedbackDialog
+        open={open}
+        onOpenChange={setOpen}
+        kind="bug"
+        initialTitle={t('route.errorTitle')}
+        initialDescription={error.message}
+        initialActual={error.message}
+        initialStack={error.stack ?? ''}
+      />
     </PageFrame>
   );
 }

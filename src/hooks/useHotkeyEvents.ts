@@ -1,7 +1,8 @@
 import { useEffect } from 'react';
 import { listen } from '@tauri-apps/api/event';
 import { invoke } from '@tauri-apps/api/core';
-import { toast } from 'sonner';
+import { toast } from '@/components/ui-system/toast';
+import { mapBackendError } from '@/i18n';
 
 export const useHotkeyEvents = () => {
   useEffect(() => {
@@ -12,7 +13,9 @@ export const useHotkeyEvents = () => {
     const unlistenError = listen<{ message?: string }>(
       'error-occurred',
       event => {
-        toast.error(event.payload.message || 'Error de dictado');
+        toast.error(
+          mapBackendError(event.payload.message || 'errors.dictation')
+        );
       }
     );
     const unlistenDone = listen<{ text?: string }>(

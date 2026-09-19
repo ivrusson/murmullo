@@ -79,6 +79,9 @@ pub struct RuntimeStatus {
     pub llm_server: ComponentStatus,
     pub llm_model: Option<String>,
     pub llm_model_status: ComponentStatus,
+    pub llm_provider: String,
+    pub llm_kind: String,
+    pub llm_models: Vec<String>,
     pub dictation_ready: bool,
 }
 
@@ -89,6 +92,7 @@ pub struct RuntimeManager {
     models_dir: PathBuf,
     runtime_dir: PathBuf,
     stt_port: u16,
+    llm_provider: String,
     llm_url: String,
     llm_model: String,
     language: Option<String>,
@@ -101,6 +105,7 @@ impl RuntimeManager {
         models_dir: PathBuf,
         runtime_dir: PathBuf,
         stt_port: u16,
+        llm_provider: String,
         llm_url: String,
         llm_model: String,
     ) -> Self {
@@ -113,6 +118,7 @@ impl RuntimeManager {
             models_dir,
             runtime_dir,
             stt_port,
+            llm_provider: crate::llm::normalize_provider(&llm_provider),
             llm_url,
             llm_model,
             language: None,
@@ -145,16 +151,22 @@ impl RuntimeManager {
         format!("{}/api/tags", self.llm_url)
     }
 
+    pub fn llm_is_server(&self) -> bool {
+        crate::llm::is_server_provider(&self.llm_provider)
+    }
+
+    pub fn set_llm_config(&mut self, provider: String, llm_url: String, llm_model: String) {
+        self.llm_provider = crate::llm::normalize_provider(&provider);
+        self.llm_url = llm_url;
+        self.llm_model = llm_model;
+    }
+
     pub fn find_stt_binary(&self) -> Option<PathBuf> {
         find_binary(
             "nemo-speech",
             "NEMO_SPEECH_BIN",
             &stt_search_paths(&self.runtime_dir),
         )
-    }
-
-    pub fn find_llm_binary() -> Option<PathBuf> {
-        find_binary("ollama", "OLLAMA_BIN", &llm_search_paths())
     }
 
     pub fn parakeet_path(&self) -> PathBuf {
@@ -188,7 +200,7 @@ impl RuntimeManager {
         } else if install.phase == "error" {
             ComponentStatus::error(install.error.as_deref().unwrap_or(&install.message))
         } else {
-            ComponentStatus::missing("nemo-speech no está instalado. Pulsa Instalar y arrancar.")
+            ComponentStatus::missing(&crate::codes::code("runtime.not_installed"))
         };
 
         let model_path = self.parakeet_path();
@@ -197,7 +209,10 @@ impl RuntimeManager {
         } else if let Some(p) = download_progress {
             ComponentStatus {
                 state: "downloading".into(),
-                message: format!("Descargando Parakeet Q8 ({:.0}%)", p),
+                message: crate::codes::code_json(
+                    "status.downloadingModel",
+                    serde_json::json!({ "pct": format!("{:.0}", p) }),
+                ),
                 progress: Some(p),
             }
         } else if install.phase == "downloading_model" {
@@ -207,7 +222,7 @@ impl RuntimeManager {
                 progress: install.progress,
             }
         } else {
-            ComponentStatus::missing("Modelo Parakeet Q8 no descargado.")
+            ComponentStatus::missing(&crate::codes::code("status.modelMissing"))
         };
 
         let stt_ready = self.stt_is_ready_blocking();
@@ -218,55 +233,62 @@ impl RuntimeManager {
         } else if self.stt_child.is_some() || install.phase == "starting" {
             ComponentStatus {
                 state: "starting".into(),
-                message: "Cargando modelo en RAM…".into(),
+                message: crate::codes::code("status.loadingRam"),
                 progress: None,
             }
         } else if self.find_stt_binary().is_some() && model_path.exists() {
-            ComponentStatus::stopped("Servidor STT parado.")
+            ComponentStatus::stopped(&crate::codes::code("status.sttStopped"))
         } else {
-            ComponentStatus::missing("Servidor STT no arrancado.")
+            ComponentStatus::missing(&crate::codes::code("status.sttMissing"))
         };
 
-        let llm_bin = Self::find_llm_binary();
-        let ollama_app = ollama_app_installed();
-        let probe = self.llm_probe();
+        let snap = crate::llm::snapshot(&self.llm_provider, &self.llm_url, &self.llm_model);
 
-        let llm_binary = match &llm_bin {
-            Some(p) => ComponentStatus::ready(&p.display().to_string()),
-            None if probe.ready => {
-                ComponentStatus::ready("Ollama responde en HTTP (CLI no está en PATH).")
-            }
-            None if ollama_app => ComponentStatus::ready("/Applications/Ollama.app"),
-            None => ComponentStatus::missing(
-                "Ollama no está instalado (opcional). El dictado funciona sin él.",
-            ),
-        };
-
-        let llm_server = if probe.ready {
-            ComponentStatus::running(&self.llm_url)
-        } else if llm_bin.is_some() || ollama_app {
-            ComponentStatus::stopped(&format!(
-                "Ollama está instalado pero no responde en {}.",
-                self.llm_url
-            ))
+        let llm_binary = if let Some(path) = &snap.binary {
+            ComponentStatus::ready(path)
+        } else if snap.kind == "server" && snap.ready {
+            ComponentStatus::ready(&crate::codes::code("status.cliResponding"))
         } else {
-            ComponentStatus::missing("LLM no instalado. El dictado sigue funcionando sin él.")
+            ComponentStatus::missing(&snap.hint)
         };
 
-        let configured = self.llm_model.clone();
-        let model_found = probe.models.iter().any(|m| model_matches(m, &configured));
-        let llm_model_status = if !probe.ready {
-            if llm_bin.is_some() || ollama_app {
-                ComponentStatus::stopped(&format!("Arranca Ollama para usar {}.", configured))
+        let llm_server = if snap.kind == "server" {
+            if snap.ready {
+                ComponentStatus::running(&self.llm_url)
+            } else if snap.installed {
+                ComponentStatus::stopped(&crate::codes::code_json(
+                    "status.llmInstalledNoServer",
+                    serde_json::json!({ "label": snap.label, "url": self.llm_url }),
+                ))
             } else {
-                ComponentStatus::missing("Sin servidor LLM.")
+                ComponentStatus::missing(&snap.hint)
             }
-        } else if model_found {
-            ComponentStatus::ready(&configured)
+        } else if snap.ready {
+            ComponentStatus::running(&crate::codes::code_json(
+                "status.llmCliReady",
+                serde_json::json!({ "label": snap.label }),
+            ))
+        } else if snap.installed {
+            ComponentStatus::stopped(&snap.hint)
         } else {
-            ComponentStatus::missing(&format!(
-                "{} no está descargado en Ollama. El dictado sigue sin LLM.",
-                configured
+            ComponentStatus::missing(&snap.hint)
+        };
+
+        let llm_model_status = if !snap.ready {
+            if snap.installed {
+                ComponentStatus::stopped(&crate::codes::code_json(
+                    "status.startLlmToUse",
+                    serde_json::json!({ "label": snap.label, "model": snap.model }),
+                ))
+            } else {
+                ComponentStatus::missing(&crate::codes::code("status.noLlmBackend"))
+            }
+        } else if snap.model_ready {
+            ComponentStatus::ready(&snap.model)
+        } else {
+            ComponentStatus::missing(&crate::codes::code_json(
+                "status.llmModelUnavailable",
+                serde_json::json!({ "model": snap.model, "label": snap.label }),
             ))
         };
 
@@ -277,33 +299,20 @@ impl RuntimeManager {
             stt_server,
             llm_binary,
             llm_server,
-            llm_model: if probe.ready && model_found {
-                Some(configured)
-            } else if probe.ready {
-                probe.models.first().cloned()
+            llm_model: if snap.model_ready {
+                Some(snap.model)
             } else {
-                None
+                snap.models.first().cloned()
             },
             llm_model_status,
+            llm_provider: snap.provider,
+            llm_kind: snap.kind,
+            llm_models: snap.models,
         }
     }
 
     pub fn stt_is_ready_blocking(&self) -> bool {
         http_ok_off_tokio(format!("{}/ready", self.stt_base_url()))
-    }
-
-    fn llm_is_ready_blocking(&self) -> bool {
-        self.llm_probe().ready
-    }
-
-    fn llm_probe(&self) -> LlmProbe {
-        let llm_url = self.llm_url.clone();
-        std::thread::Builder::new()
-            .name("murmullo-llm-probe".into())
-            .spawn(move || probe_llm(&llm_url))
-            .ok()
-            .and_then(|handle| handle.join().ok())
-            .unwrap_or_default()
     }
 
     pub fn start_stt(&mut self, model_path: &Path) -> Result<()> {
@@ -320,12 +329,12 @@ impl RuntimeManager {
 
         self.stop_stt();
 
-        let bin = self.find_stt_binary().ok_or_else(|| {
-            anyhow!("nemo-speech no encontrado. Pulsa Instalar y arrancar en Runtimes.")
-        })?;
+        let bin = self
+            .find_stt_binary()
+            .ok_or_else(|| anyhow!(crate::codes::code("runtime.bin_missing")))?;
 
         if !model_path.exists() {
-            return Err(anyhow!("Modelo no encontrado: {}", model_path.display()));
+            return Err(anyhow!(crate::codes::code("model.path_missing")));
         }
 
         let device = if cfg!(target_os = "macos") && cfg!(target_arch = "aarch64") {
@@ -390,33 +399,18 @@ impl RuntimeManager {
     }
 
     pub fn start_llm(&mut self) -> Result<()> {
-        if self.llm_is_ready_blocking() {
-            return Ok(());
-        }
-        if let Some(bin) = Self::find_llm_binary() {
-            let child = Command::new(bin)
-                .arg("serve")
-                .stdin(Stdio::null())
-                .stdout(Stdio::null())
-                .stderr(Stdio::null())
-                .spawn()?;
-            self.llm_child = Some(child);
-            self.we_started_llm = true;
-            crate::pipeline::log("llm", "ollama serve started");
-            return Ok(());
-        }
-        if ollama_app_installed() {
-            let status = Command::new("open").args(["-a", "Ollama"]).status()?;
-            if !status.success() {
-                return Err(anyhow!("No se pudo abrir Ollama.app"));
+        match crate::llm::start_backend(&self.llm_provider, &self.llm_url)? {
+            crate::llm::StartOutcome::AlreadyReady => Ok(()),
+            crate::llm::StartOutcome::OpenedApp => {
+                self.we_started_llm = false;
+                Ok(())
             }
-            self.we_started_llm = false;
-            crate::pipeline::log("llm", "opened Ollama.app");
-            return Ok(());
+            crate::llm::StartOutcome::Spawned(child) => {
+                self.llm_child = Some(child);
+                self.we_started_llm = true;
+                Ok(())
+            }
         }
-        Err(anyhow!(
-            "Ollama no está instalado. Instálalo desde https://ollama.com (opcional)."
-        ))
     }
 
     pub fn stop_llm(&mut self) {
@@ -440,23 +434,15 @@ impl RuntimeManager {
 
     #[allow(dead_code)]
     pub async fn rewrite_with_llm(&self, system_prompt: &str, user_text: &str) -> Result<String> {
-        rewrite_with_llm_at(&self.llm_url, &self.llm_model, system_prompt, user_text).await
-    }
-}
-
-pub async fn is_http_ok(url: &str) -> bool {
-    let Ok(client) = reqwest::Client::builder()
-        .timeout(Duration::from_secs(1))
-        .build()
-    else {
-        return false;
-    };
-    client
-        .get(url)
-        .send()
+        crate::llm::rewrite(
+            &self.llm_provider,
+            &self.llm_url,
+            &self.llm_model,
+            system_prompt,
+            user_text,
+        )
         .await
-        .map(|r| r.status().is_success())
-        .unwrap_or(false)
+    }
 }
 
 pub async fn wait_http_ready(url: &str, timeout: Duration) -> Result<()> {
@@ -466,7 +452,7 @@ pub async fn wait_http_ready(url: &str, timeout: Duration) -> Result<()> {
     let start = std::time::Instant::now();
     loop {
         if start.elapsed() > timeout {
-            return Err(anyhow!("Timeout esperando a que el runtime esté listo"));
+            return Err(anyhow!(crate::codes::code("runtime.start_timeout")));
         }
         if let Ok(resp) = client.get(url).send().await {
             if resp.status().is_success() {
@@ -520,7 +506,7 @@ pub async fn transcribe_wav_at(
                 "stt",
                 format!("FAILED connect {url}: {e} — is nemo-speech running on {base_url}?"),
             );
-            return Err(anyhow!("No se pudo conectar a nemo-speech en {url}: {e}"));
+            return Err(anyhow!(crate::codes::code("runtime.connect_failed")));
         }
     };
 
@@ -565,74 +551,6 @@ pub async fn transcribe_wav_at(
         );
     }
     Ok(text)
-}
-
-pub async fn rewrite_with_llm_at(
-    llm_url: &str,
-    llm_model: &str,
-    system_prompt: &str,
-    user_text: &str,
-) -> Result<String> {
-    let url = format!("{}/api/chat", llm_url);
-    let body = serde_json::json!({
-        "model": llm_model,
-        "stream": false,
-        "messages": [
-            { "role": "system", "content": system_prompt },
-            { "role": "user", "content": user_text }
-        ]
-    });
-    crate::pipeline::log(
-        "llm",
-        format!("POST {url} model={llm_model} chars={}", user_text.len()),
-    );
-    let client = reqwest::Client::builder()
-        .timeout(Duration::from_secs(30))
-        .build()?;
-    let resp = match client.post(&url).json(&body).send().await {
-        Ok(resp) => resp,
-        Err(e) => {
-            crate::pipeline::log("llm", format!("FAILED {url}: {e}"));
-            return Err(anyhow!("LLM connect error: {e}"));
-        }
-    };
-    let status = resp.status();
-    if !status.is_success() {
-        let err_body = resp.text().await.unwrap_or_default();
-        let preview: String = err_body.chars().take(240).collect();
-        crate::pipeline::log("llm", format!("HTTP {status} body={preview}"));
-        return Err(anyhow!("LLM HTTP {status}: {preview}"));
-    }
-    let json: serde_json::Value = resp.json().await?;
-    let text = json
-        .pointer("/message/content")
-        .and_then(|v| v.as_str())
-        .unwrap_or("")
-        .trim()
-        .to_string();
-    if text.is_empty() {
-        crate::pipeline::log("llm", "empty rewrite");
-        return Err(anyhow!("LLM returned empty text"));
-    }
-    crate::pipeline::log("llm", format!("rewrite chars={}", text.len()));
-    Ok(text)
-}
-
-pub async fn llm_has_model(llm_url: &str, wanted: &str) -> bool {
-    let Ok(client) = reqwest::Client::builder()
-        .timeout(Duration::from_secs(2))
-        .build()
-    else {
-        return false;
-    };
-    let Ok(resp) = client.get(format!("{llm_url}/api/tags")).send().await else {
-        return false;
-    };
-    if !resp.status().is_success() {
-        return false;
-    }
-    let models = parse_ollama_models(resp.json::<serde_json::Value>().await.ok());
-    models.iter().any(|m| model_matches(m, wanted))
 }
 
 impl Drop for RuntimeManager {
@@ -714,12 +632,6 @@ fn pump_nemo_stdio(stream: impl Read + Send + 'static, stream_name: &'static str
         });
 }
 
-#[derive(Debug, Default, Clone)]
-struct LlmProbe {
-    ready: bool,
-    models: Vec<String>,
-}
-
 fn http_ok_off_tokio(url: String) -> bool {
     std::thread::Builder::new()
         .name("murmullo-http-probe".into())
@@ -741,73 +653,6 @@ fn http_ok_off_tokio(url: String) -> bool {
         .unwrap_or(false)
 }
 
-fn probe_llm(llm_url: &str) -> LlmProbe {
-    let client = match reqwest::blocking::Client::builder()
-        .timeout(Duration::from_secs(2))
-        .build()
-    {
-        Ok(c) => c,
-        Err(_) => return LlmProbe::default(),
-    };
-
-    let tags_url = format!("{}/api/tags", llm_url);
-    if let Ok(resp) = client.get(&tags_url).send() {
-        if resp.status().is_success() {
-            let models = parse_ollama_models(resp.json::<serde_json::Value>().ok());
-            return LlmProbe {
-                ready: true,
-                models,
-            };
-        }
-    }
-
-    let version_url = format!("{}/api/version", llm_url);
-    if let Ok(resp) = client.get(&version_url).send() {
-        if resp.status().is_success() {
-            return LlmProbe {
-                ready: true,
-                models: Vec::new(),
-            };
-        }
-    }
-
-    LlmProbe::default()
-}
-
-fn parse_ollama_models(json: Option<serde_json::Value>) -> Vec<String> {
-    let Some(json) = json else {
-        return Vec::new();
-    };
-    json.get("models")
-        .and_then(|v| v.as_array())
-        .map(|arr| {
-            arr.iter()
-                .filter_map(|m| {
-                    m.get("name")
-                        .or_else(|| m.get("model"))
-                        .and_then(|v| v.as_str())
-                        .map(|s| s.to_string())
-                })
-                .collect()
-        })
-        .unwrap_or_default()
-}
-
-fn model_matches(installed: &str, wanted: &str) -> bool {
-    let inst = installed.to_lowercase();
-    let want = wanted.to_lowercase();
-    if inst == want {
-        return true;
-    }
-    let inst_base = inst.split(':').next().unwrap_or(&inst);
-    let want_base = want.split(':').next().unwrap_or(&want);
-    inst_base == want_base
-}
-
-fn ollama_app_installed() -> bool {
-    Path::new("/Applications/Ollama.app").is_dir()
-}
-
 fn stt_search_paths(runtime_dir: &Path) -> Vec<PathBuf> {
     let mut paths = vec![
         managed_binary_path(runtime_dir),
@@ -827,22 +672,6 @@ fn common_bin_paths(name: &str) -> Vec<PathBuf> {
         PathBuf::from("/usr/local/bin").join(name),
         PathBuf::from("/usr/bin").join(name),
     ]
-}
-
-fn llm_search_paths() -> Vec<PathBuf> {
-    let mut paths = common_bin_paths("ollama");
-    paths.push(PathBuf::from("/opt/homebrew/opt/ollama/bin/ollama"));
-    paths.push(PathBuf::from(
-        "/Applications/Ollama.app/Contents/Resources/ollama",
-    ));
-    paths.push(PathBuf::from(
-        "/Applications/Ollama.app/Contents/MacOS/ollama",
-    ));
-    if let Some(home) = dirs::home_dir() {
-        paths.push(home.join(".local/bin/ollama"));
-        paths.push(home.join(".ollama/bin/ollama"));
-    }
-    paths
 }
 
 fn apply_runtime_lib_path(cmd: &mut Command, bin: &Path) {

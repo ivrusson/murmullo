@@ -57,6 +57,7 @@ export interface RuntimeConfig {
   stt_port: number;
   llm_url: string;
   llm_model: string;
+  llm_provider?: string;
   llm_enabled: boolean;
   default_language?: string;
 }
@@ -71,12 +72,25 @@ export interface AudioConfig {
   min_audio_length: number;
 }
 
+export interface OverlayLayout {
+  x: number | null;
+  y: number | null;
+  compact: boolean;
+  style?: OverlayStyle;
+}
+
+export type OverlayStyle = 'pill' | 'island' | 'card';
+
 export interface UiConfig {
   theme: ThemePreference;
   language: string;
   show_debug_info: boolean;
   auto_save_transcriptions: boolean;
   selected_model?: string;
+  overlay_x?: number | null;
+  overlay_y?: number | null;
+  overlay_compact?: boolean;
+  overlay_style?: OverlayStyle;
 }
 
 export interface ComponentStatus {
@@ -93,7 +107,22 @@ export interface RuntimeStatus {
   llm_server: ComponentStatus;
   llm_model: string | null;
   llm_model_status?: ComponentStatus;
+  llm_provider?: string;
+  llm_kind?: string;
+  llm_models?: string[];
   dictation_ready: boolean;
+}
+
+export interface LlmProviderInfo {
+  id: string;
+  label: string;
+  kind: 'server' | 'cli' | string;
+  installed: boolean;
+  ready: boolean;
+  binary: string | null;
+  default_model: string;
+  models: string[];
+  hint: string;
 }
 
 export interface PipelineLogEntry {

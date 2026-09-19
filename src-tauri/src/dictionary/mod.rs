@@ -36,13 +36,11 @@ pub struct DictionaryStore {
 
 impl DictionaryStore {
     pub fn new() -> Result<Self, Box<dyn std::error::Error>> {
-        let dir = dirs::data_dir()
-            .ok_or("Could not find data directory")?
-            .join("murmullo");
-        fs::create_dir_all(&dir)?;
+        crate::paths::ensure_layout();
+        fs::create_dir_all(crate::paths::app_dir())?;
         Ok(Self {
-            path: dir.join("dictionary.json"),
-            prompt_path: dir.join("prompt.md"),
+            path: crate::paths::dictionary_file(),
+            prompt_path: crate::paths::prompt_file(),
         })
     }
 

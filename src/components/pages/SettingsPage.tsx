@@ -1,84 +1,125 @@
 import { useState, useEffect } from 'react';
-import { toast } from 'sonner';
+import { toast } from '@/components/ui-system/toast';
 import * as stylex from '@stylexjs/stylex';
-import { configService } from '@/services/tauri';
+import { configService, runtimeService } from '@/services/tauri';
 import { GlobalSelectors } from '@/components/GlobalSelectors';
 import { HotkeyRecorder } from '@/components/HotkeyRecorder';
+import { OverlayStylePicker } from '@/components/OverlayStylePicker';
 import { ThemeToggle } from '@/components/ThemeToggle';
+import { LocaleToggle } from '@/components/LocaleToggle';
+import { useT, mapBackendError } from '@/i18n';
+import { Switch } from '@/components/ui-system/Switch';
+import { Select } from '@/components/ui-system/Select';
+import { ComboBox } from '@/components/ui-system/ComboBox';
 import { useAppConfig } from '@/contexts/AppConfigContext';
 import { validateHotkey } from '@/lib/hotkey';
-import type { AppConfig } from '@/types';
+import type { AppConfig, LlmProviderInfo } from '@/types';
 import { PageFrame } from '@/components/ui-system/PageFrame';
 import { PageHeader } from '@/components/ui-system/PageHeader';
 import { Surface } from '@/components/ui-system/Surface';
-import { BoothButton } from '@/components/ui-system/BoothButton';
-import { color, radius, space } from '@/styles/tokens.stylex';
+import { Button } from '@/components/ui-system/Button';
+import { color, font, space } from '@/styles/tokens.stylex';
 import { sx } from '@/components/ui-system/sx';
+import { FeedbackLaunchButtons } from '@/components/FeedbackDialog';
 
 const styles = stylex.create({
   grid: {
     display: 'grid',
     gridTemplateColumns: {
       default: '1fr 1fr',
-      '@media (max-width: 1080px)': '1fr',
+      '@media (max-width: 1100px)': '1fr',
     },
     gap: space.md,
+    alignItems: 'start',
   },
   kicker: {
     margin: 0,
     marginBottom: space.md,
-    color: color.copper,
-    fontSize: '0.8rem',
+    color: color.muted,
+    fontFamily: font.sans,
+    fontSize: 12,
+    fontWeight: 600,
+    letterSpacing: '0.02em',
   },
   copy: {
     margin: 0,
-    color: color.muted,
-    fontSize: '0.85rem',
-    lineHeight: 1.5,
+    color: '#5A5551',
+    fontFamily: font.sans,
+    fontSize: 13,
+    lineHeight: '20px',
   },
   error: {
     color: color.danger,
-    fontSize: '0.8rem',
+    fontSize: 13,
   },
   toggle: {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: space.md,
-    padding: space.md,
-    borderRadius: radius.md,
-    backgroundColor: color.raised,
+    paddingBlock: 14,
+    paddingInline: 16,
+    borderRadius: 20,
+    backgroundColor: '#FFFFFF',
+    borderColor: color.line,
+    borderStyle: 'solid',
+    borderWidth: 1,
     cursor: 'pointer',
     marginBottom: space.sm,
   },
   label: {
     margin: 0,
-    fontSize: '0.9rem',
+    fontFamily: font.sans,
+    fontSize: 14,
     fontWeight: 600,
+  },
+  themeWrap: {
+    marginTop: space.md,
+  },
+  field: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 6,
+    marginBottom: space.sm,
+  },
+  fieldLabel: {
+    margin: 0,
+    fontFamily: font.sans,
+    fontSize: 12,
+    fontWeight: 600,
+    color: color.muted,
+  },
+  helpActions: {
+    marginTop: space.md,
   },
 });
 
 export function SettingsPage() {
+  const t = useT();
   const { refreshConfig } = useAppConfig();
   const [config, setConfig] = useState<AppConfig | null>(null);
   const [hasChanges, setHasChanges] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [hotkeyError, setHotkeyError] = useState<string | null>(null);
+  const [providers, setProviders] = useState<LlmProviderInfo[]>([]);
 
   useEffect(() => {
-    loadConfig();
-  }, []);
-
-  const loadConfig = async () => {
-    try {
-      setIsLoading(true);
-      setConfig(await configService.getConfig());
-    } catch {
-      toast.error('No se pudieron cargar los ajustes');
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    const load = async () => {
+      try {
+        setIsLoading(true);
+        setConfig(await configService.getConfig());
+      } catch {
+        toast.error(t('settings.loadFailed'));
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    void load();
+    runtimeService
+      .listLlmProviders()
+      .then(setProviders)
+      .catch(() => undefined);
+  }, [t]);
 
   const handleSave = async () => {
     if (!config) return;
@@ -101,7 +142,8 @@ export function SettingsPage() {
         configService.updateRuntimeConfig(
           config.runtime.llm_enabled,
           config.runtime.llm_model,
-          config.runtime.default_language
+          config.runtime.default_language,
+          config.runtime.llm_provider || 'ollama'
         ),
         configService.updateHotkeyConfig(
           config.hotkeys.push_to_talk,
@@ -111,14 +153,9 @@ export function SettingsPage() {
       setHasChanges(false);
       setHotkeyError(null);
       await refreshConfig();
-      toast.success('Ajustes guardados');
+      toast.success(t('settings.saved'));
     } catch (error) {
-      const message =
-        typeof error === 'string'
-          ? error
-          : error instanceof Error
-            ? error.message
-            : 'No se pudo guardar';
+      const message = mapBackendError(error);
       setHotkeyError(message);
       toast.error(message);
     }
@@ -127,17 +164,17 @@ export function SettingsPage() {
   return (
     <PageFrame>
       <PageHeader
-        title="Ajustes"
-        lede="Apariencia, audio, atajos e inserción local."
+        title={t('settings.title')}
+        lede={t('settings.lede')}
         actions={
-          <BoothButton
+          <Button
             onClick={() => void handleSave()}
             disabled={
               !hasChanges || isLoading || !config?.hotkeys.push_to_talk?.trim()
             }
           >
-            Guardar
-          </BoothButton>
+            {t('common.save')}
+          </Button>
         }
       />
 
@@ -145,17 +182,14 @@ export function SettingsPage() {
         <div {...sx(styles.grid)}>
           <AppearanceCard />
           <Surface>
-            <p {...sx(styles.copy)}>Cargando ajustes…</p>
+            <p {...sx(styles.copy)}>{t('settings.loading')}</p>
           </Surface>
         </div>
       ) : !config ? (
         <div {...sx(styles.grid)}>
           <AppearanceCard />
           <Surface>
-            <p {...sx(styles.copy)}>
-              No se pudieron cargar los ajustes. Abre Murmullo como app de
-              escritorio.
-            </p>
+            <p {...sx(styles.copy)}>{t('settings.desktopOnly')}</p>
           </Surface>
         </div>
       ) : (
@@ -163,12 +197,12 @@ export function SettingsPage() {
           <AppearanceCard />
 
           <Surface>
-            <p {...sx(styles.kicker)}>Dispositivo de entrada</p>
+            <p {...sx(styles.kicker)}>{t('settings.inputDevice')}</p>
             <GlobalSelectors />
           </Surface>
 
           <Surface>
-            <p {...sx(styles.kicker)}>Atajos globales</p>
+            <p {...sx(styles.kicker)}>{t('settings.globalShortcuts')}</p>
             <HotkeyRecorder
               value={config.hotkeys.push_to_talk}
               occupied={
@@ -187,23 +221,18 @@ export function SettingsPage() {
                   hotkeys: { ...config.hotkeys, push_to_talk: next },
                 });
                 await refreshConfig();
-                toast.success('Atajo actualizado');
+                toast.success(t('settings.hotkeyUpdated'));
               }}
             />
-            {hotkeyError ? (
-              <p {...sx(styles.error)}>{hotkeyError}</p>
-            ) : null}
-            <p {...sx(styles.copy)}>
-              Mantén pulsado para dictar. El atajo nuevo se aplica al instante,
-              sin reiniciar.
-            </p>
+            {hotkeyError ? <p {...sx(styles.error)}>{hotkeyError}</p> : null}
+            <p {...sx(styles.copy)}>{t('settings.hotkeyHint')}</p>
           </Surface>
 
           <Surface>
-            <p {...sx(styles.kicker)}>Cancelación y audio</p>
+            <p {...sx(styles.kicker)}>{t('settings.cancelAudio')}</p>
             <Toggle
-              label="Reducción de ruido"
-              description="Filtra el fondo antes del STT"
+              label={t('settings.noise')}
+              description={t('settings.noiseHint')}
               checked={config.audio.noise_reduction}
               onChange={checked => {
                 setConfig({
@@ -214,8 +243,8 @@ export function SettingsPage() {
               }}
             />
             <Toggle
-              label="Normalización"
-              description="Nivela el volumen del clip"
+              label={t('settings.normalize')}
+              description={t('settings.normalizeHint')}
               checked={config.audio.normalization}
               onChange={checked => {
                 setConfig({
@@ -228,10 +257,10 @@ export function SettingsPage() {
           </Surface>
 
           <Surface>
-            <p {...sx(styles.kicker)}>Reformulación IA</p>
+            <p {...sx(styles.kicker)}>{t('settings.llmRewrite')}</p>
             <Toggle
-              label="Reescribir con LLM local"
-              description={`${config.runtime.llm_model} en ${config.runtime.llm_url}`}
+              label={t('settings.rewrite')}
+              description={llmDescription(config.runtime, providers, t)}
               checked={config.runtime.llm_enabled}
               onChange={checked => {
                 setConfig({
@@ -241,23 +270,151 @@ export function SettingsPage() {
                 setHasChanges(true);
               }}
             />
+            <div {...sx(styles.field)}>
+              <p {...sx(styles.fieldLabel)}>{t('settings.provider')}</p>
+              <Select
+                value={config.runtime.llm_provider || 'ollama'}
+                onValueChange={value => {
+                  const next = providers.find(item => item.id === value);
+                  const keepModel =
+                    next?.models.includes(config.runtime.llm_model) ?? false;
+                  setConfig({
+                    ...config,
+                    runtime: {
+                      ...config.runtime,
+                      llm_provider: value,
+                      llm_model: keepModel
+                        ? config.runtime.llm_model
+                        : (next?.default_model ?? config.runtime.llm_model),
+                    },
+                  });
+                  setHasChanges(true);
+                }}
+                items={(providers.length > 0
+                  ? providers
+                  : [
+                      {
+                        id: 'ollama',
+                        label: 'Ollama',
+                        installed: true,
+                      },
+                      { id: 'kimi', label: 'Kimi', installed: false },
+                      { id: 'kilo', label: 'Kilo', installed: false },
+                      { id: 'cursor', label: 'Cursor', installed: false },
+                      { id: 'claude', label: 'Claude', installed: false },
+                    ]
+                ).map(item => ({
+                  value: item.id,
+                  label: item.installed
+                    ? item.label
+                    : t('settings.notInstalled', { label: item.label }),
+                }))}
+                placeholder={t('settings.chooseProvider')}
+              />
+            </div>
+            <div {...sx(styles.field)}>
+              <p {...sx(styles.fieldLabel)}>{t('settings.model')}</p>
+              <ComboBox
+                value={config.runtime.llm_model}
+                onValueChange={value => {
+                  if (!value) return;
+                  setConfig({
+                    ...config,
+                    runtime: { ...config.runtime, llm_model: value },
+                  });
+                  setHasChanges(true);
+                }}
+                options={modelOptions(config, providers)}
+                placeholder={t('settings.chooseModel')}
+                searchPlaceholder={t('settings.searchModel')}
+                emptyText={t('settings.noModels')}
+              />
+            </div>
+            {selectedProvider(config, providers)?.hint ? (
+              <p {...sx(styles.copy)}>
+                {selectedProvider(config, providers)?.hint}
+              </p>
+            ) : null}
           </Surface>
         </div>
       )}
+      <HelpCard />
     </PageFrame>
   );
 }
 
 function AppearanceCard() {
+  const t = useT();
   return (
     <Surface>
-      <p {...sx(styles.kicker)}>Apariencia</p>
-      <p {...sx(styles.copy)}>
-        Cambia entre modo claro, oscuro o el del sistema. Se aplica al instante.
+      <p {...sx(styles.kicker)}>{t('settings.appearance')}</p>
+      <p {...sx(styles.copy)}>{t('settings.appearanceBody')}</p>
+      <div {...sx(styles.themeWrap)}>
+        <ThemeToggle />
+      </div>
+      <p {...sx(styles.kicker)} style={{ marginTop: 16 }}>
+        {t('settings.language')}
       </p>
-      <ThemeToggle />
+      <p {...sx(styles.copy)}>{t('settings.languageBody')}</p>
+      <div {...sx(styles.themeWrap)}>
+        <LocaleToggle />
+      </div>
+      <OverlayStylePicker />
     </Surface>
   );
+}
+
+function HelpCard() {
+  const t = useT();
+  return (
+    <Surface>
+      <p {...sx(styles.kicker)}>{t('feedback.helpTitle')}</p>
+      <p {...sx(styles.copy)}>{t('feedback.helpBody')}</p>
+      <div {...sx(styles.helpActions)}>
+        <FeedbackLaunchButtons />
+      </div>
+    </Surface>
+  );
+}
+
+function selectedProvider(
+  config: AppConfig,
+  providers: LlmProviderInfo[]
+): LlmProviderInfo | undefined {
+  const id = config.runtime.llm_provider || 'ollama';
+  return providers.find(item => item.id === id);
+}
+
+function modelOptions(config: AppConfig, providers: LlmProviderInfo[]) {
+  const provider = selectedProvider(config, providers);
+  const models = new Set(provider?.models ?? []);
+  if (config.runtime.llm_model) {
+    models.add(config.runtime.llm_model);
+  }
+  return Array.from(models).map(value => ({ value, label: value }));
+}
+
+function llmDescription(
+  runtime: AppConfig['runtime'],
+  providers: LlmProviderInfo[],
+  t: (
+    key: import('@/i18n').AppMessageKey,
+    params?: import('@/i18n').TranslateParams
+  ) => string
+): string {
+  const provider =
+    providers.find(item => item.id === (runtime.llm_provider || 'ollama'))
+      ?.label ??
+    runtime.llm_provider ??
+    'Ollama';
+  if ((runtime.llm_provider || 'ollama') === 'ollama') {
+    return t('settings.llmDescUrl', {
+      model: runtime.llm_model,
+      provider,
+      url: runtime.llm_url,
+    });
+  }
+  return t('settings.llmDesc', { model: runtime.llm_model, provider });
 }
 
 function Toggle({
@@ -277,11 +434,7 @@ function Toggle({
         <p {...sx(styles.label)}>{label}</p>
         <p {...sx(styles.copy)}>{description}</p>
       </div>
-      <input
-        type="checkbox"
-        checked={checked}
-        onChange={e => onChange(e.target.checked)}
-      />
+      <Switch checked={checked} onCheckedChange={onChange} />
     </label>
   );
 }

@@ -47,14 +47,11 @@ pub struct TranscriptionPersistence {
 
 impl TranscriptionPersistence {
     pub fn new() -> Result<Self, Box<dyn std::error::Error>> {
-        let data_dir = dirs::data_dir()
-            .ok_or("Could not find data directory")?
-            .join("murmullo");
+        crate::paths::ensure_layout();
+        let data_dir = crate::paths::app_dir();
+        let database_path = crate::paths::transcriptions_file();
+        let recordings_dir = crate::paths::recordings_dir();
 
-        let database_path = data_dir.join("transcriptions.json");
-        let recordings_dir = data_dir.join("recordings");
-
-        // Create directories if they don't exist
         fs::create_dir_all(&data_dir)?;
         fs::create_dir_all(&recordings_dir)?;
 
@@ -72,7 +69,12 @@ impl TranscriptionPersistence {
         }
 
         let content = fs::read_to_string(&self.database_path)?;
-        let database: TranscriptionDatabase = serde_json::from_str(&content)?;
+        let mut database: TranscriptionDatabase = serde_json::from_str(&content)?;
+        let rewritten = self.relocate_audio_paths(&mut database);
+        if rewritten > 0 {
+            self.save_database(&database)?;
+            println!("📦 Updated {rewritten} recording paths to ~/.murmullo");
+        }
 
         println!("📖 Loaded {} transcription records", database.records.len());
         Ok(database)
@@ -169,10 +171,10 @@ impl TranscriptionPersistence {
         id: &str,
     ) -> Result<bool, Box<dyn std::error::Error>> {
         if let Some(record) = database.records.remove(id) {
-            // Delete audio file
-            if Path::new(&record.audio_file_path).exists() {
-                fs::remove_file(&record.audio_file_path)?;
-                println!("🗑️ Deleted audio file: {}", record.audio_file_path);
+            let audio_path = self.resolve_audio_path(&record.audio_file_path);
+            if audio_path.exists() {
+                fs::remove_file(&audio_path)?;
+                println!("🗑️ Deleted audio file: {}", audio_path.display());
             }
 
             database.last_updated = Utc::now();
@@ -215,7 +217,34 @@ impl TranscriptionPersistence {
         database
             .records
             .get(id)
-            .map(|record| PathBuf::from(&record.audio_file_path))
+            .map(|record| self.resolve_audio_path(&record.audio_file_path))
+    }
+
+    fn resolve_audio_path(&self, stored: &str) -> PathBuf {
+        let path = PathBuf::from(stored);
+        if path.exists() {
+            return path;
+        }
+        if let Some(name) = path.file_name() {
+            let candidate = self.recordings_dir.join(name);
+            if candidate.exists() {
+                return candidate;
+            }
+        }
+        path
+    }
+
+    fn relocate_audio_paths(&self, database: &mut TranscriptionDatabase) -> usize {
+        let mut rewritten = 0;
+        for record in database.records.values_mut() {
+            let resolved = self.resolve_audio_path(&record.audio_file_path);
+            let resolved_str = resolved.to_string_lossy().to_string();
+            if resolved.exists() && resolved_str != record.audio_file_path {
+                record.audio_file_path = resolved_str;
+                rewritten += 1;
+            }
+        }
+        rewritten
     }
 
     pub fn copy_audio_file(

@@ -50,6 +50,7 @@ export interface RuntimeConfig {
   stt_port: number;
   llm_url: string;
   llm_model: string;
+  llm_provider?: string;
   llm_enabled: boolean;
   default_language?: string;
 }
@@ -64,12 +65,25 @@ export interface AudioConfig {
   min_audio_length: number;
 }
 
+export interface OverlayLayout {
+  x: number | null;
+  y: number | null;
+  compact: boolean;
+  style?: OverlayStyle;
+}
+
+export type OverlayStyle = 'pill' | 'island' | 'card';
+
 export interface UiConfig {
   theme: ThemePreference;
   language: string;
   show_debug_info: boolean;
   auto_save_transcriptions: boolean;
   selected_model?: string;
+  overlay_x?: number | null;
+  overlay_y?: number | null;
+  overlay_compact?: boolean;
+  overlay_style?: OverlayStyle;
 }
 
 export interface HotkeyConfig {

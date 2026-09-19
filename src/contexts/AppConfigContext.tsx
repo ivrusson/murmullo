@@ -108,7 +108,8 @@ export const AppConfigProvider: React.FC<{ children: ReactNode }> = ({
       await configService.updateRuntimeConfig(
         config.runtime.llm_enabled,
         config.runtime.llm_model,
-        language === 'auto' ? undefined : language
+        language === 'auto' ? undefined : language,
+        config.runtime.llm_provider
       );
     }
   };

@@ -1,9 +1,13 @@
 mod audio;
+mod codes;
 mod commands;
 mod config;
+mod crash;
 mod dictionary;
 mod insertion;
+mod llm;
 mod models;
+mod paths;
 mod permissions;
 mod pipeline;
 mod postprocess;
@@ -16,15 +20,17 @@ use commands::{
     create_floating_bar_window, delete_transcription, download_audio_file, download_model,
     ensure_floating_bar_window, ensure_stt_runtime, get_app_info, get_audio_file_path,
     get_audio_level, get_config, get_download_progress, get_insertion_mode, get_model_info,
-    get_pipeline_log_path, get_pipeline_logs, get_recordings_directory, get_runtime_status,
-    get_selected_model, get_system_prompt, get_transcription, insert_text, is_model_downloaded,
-    is_model_loaded, is_recording, list_audio_devices, list_dictionary, list_models,
-    list_transcriptions, load_model, overlay_cancel_dictation, overlay_start_dictation,
-    overlay_stop_dictation, register_global_shortcut, remove_dictionary_entry, save_transcription,
-    set_insertion_mode, set_transcription_language, show_main_window, start_llm_runtime,
-    start_push_to_talk, start_recording, start_stt_runtime, stop_push_to_talk, stop_recording,
-    stop_stt_runtime, transcribe_audio, unregister_global_shortcut, update_audio_config,
-    update_hotkey_config, update_runtime_config, update_selected_model, update_transcription,
+    get_overlay_layout, get_pipeline_log_path, get_pipeline_logs, get_recordings_directory,
+    get_runtime_status, get_selected_model, get_system_prompt, get_transcription, insert_text,
+    is_model_downloaded, is_model_loaded, is_recording, list_audio_devices, list_dictionary,
+    list_llm_providers, list_models, list_transcriptions, load_model, overlay_cancel_dictation,
+    overlay_start_dictation, overlay_stop_dictation, register_global_shortcut,
+    remove_dictionary_entry, resize_overlay, rewrite_with_configured_llm, save_overlay_position,
+    save_transcription, set_insertion_mode, set_overlay_compact, set_overlay_style,
+    set_transcription_language, show_main_window, start_llm_runtime, start_push_to_talk,
+    start_recording, start_stt_runtime, stop_push_to_talk, stop_recording, stop_stt_runtime,
+    transcribe_audio, unregister_global_shortcut, update_audio_config, update_hotkey_config,
+    update_runtime_config, update_selected_model, update_transcription, update_ui_language,
     update_ui_theme, AppState,
 };
 use config::AppConfig;
@@ -35,17 +41,15 @@ use permissions::{
     request_macos_microphone,
 };
 use runtime::RuntimeManager;
-use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use tauri::Manager;
 use transcription::persistence::TranscriptionPersistence;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let models_dir = dirs::data_dir()
-        .unwrap_or_else(|| PathBuf::from("."))
-        .join("murmullo")
-        .join("models");
+    crate::paths::ensure_layout();
+
+    let models_dir = crate::paths::models_dir();
 
     let model_manager = Arc::new(Mutex::new(
         ModelManager::new(models_dir.to_str().unwrap())
@@ -56,25 +60,23 @@ pub fn run() {
         AppConfig::load().expect("Failed to load configuration"),
     ));
 
-    let (stt_port, llm_url, llm_model) = {
+    let (stt_port, llm_provider, llm_url, llm_model) = {
         let cfg = config.lock().unwrap();
         (
             cfg.runtime.stt_port,
+            cfg.runtime.llm_provider.clone(),
             cfg.runtime.llm_url.clone(),
             cfg.runtime.llm_model.clone(),
         )
     };
 
-    let runtime_dir = dirs::data_dir()
-        .unwrap_or_else(|| PathBuf::from("."))
-        .join("murmullo")
-        .join("runtime")
-        .join("nemo-speech");
+    let runtime_dir = crate::paths::runtime_dir();
 
     let runtime = Arc::new(Mutex::new(RuntimeManager::new(
         models_dir.clone(),
         runtime_dir,
         stt_port,
+        llm_provider,
         llm_url,
         llm_model,
     )));
@@ -116,9 +118,12 @@ pub fn run() {
         transcription_database,
     };
 
+    crate::crash::install_panic_hook();
+
     tauri::Builder::default()
         .plugin(tauri_plugin_macos_permissions::init())
         .plugin(tauri_plugin_clipboard_manager::init())
+        .plugin(tauri_plugin_opener::init())
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
                 .with_handler(|app, _shortcut, event| match event.state {
@@ -143,7 +148,9 @@ pub fn run() {
             }
         })
         .setup(move |app| {
+            create_main_window(app)?;
             crate::pipeline::init(app.handle().clone());
+            crate::insertion::start_target_tracker();
             setup_tray(app)?;
 
             let shortcut_handle = app.handle().clone();
@@ -159,6 +166,8 @@ pub fn run() {
                 eprintln!("❌ Failed to create floating bar window: {e}");
                 e
             })?;
+
+            crate::crash::show_if_pending(app.handle());
 
             let runtime_boot = runtime.clone();
             let models_boot = model_manager.clone();
@@ -219,10 +228,16 @@ pub fn run() {
             update_selected_model,
             get_selected_model,
             update_ui_theme,
+            update_ui_language,
             register_global_shortcut,
             unregister_global_shortcut,
             update_hotkey_config,
             create_floating_bar_window,
+            save_overlay_position,
+            get_overlay_layout,
+            set_overlay_compact,
+            set_overlay_style,
+            resize_overlay,
             show_main_window,
             get_app_info,
             get_runtime_status,
@@ -235,6 +250,8 @@ pub fn run() {
             ensure_stt_runtime,
             stop_stt_runtime,
             start_llm_runtime,
+            list_llm_providers,
+            rewrite_with_configured_llm,
             list_dictionary,
             add_dictionary_entry,
             remove_dictionary_entry,
@@ -244,12 +261,37 @@ pub fn run() {
             request_macos_microphone,
             request_macos_accessibility,
             request_macos_input_monitoring,
+            crate::crash::get_feedback_environment,
+            crate::crash::get_pending_crash,
+            crate::crash::clear_pending_crash,
+            crate::crash::show_crash_reporter_window,
+            crate::crash::report_frontend_crash,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
 
+fn create_main_window(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
+    let window_config = app
+        .config()
+        .app
+        .windows
+        .iter()
+        .find(|window| window.label == "main")
+        .cloned()
+        .ok_or("missing main window config")?;
+
+    let builder = tauri::WebviewWindowBuilder::from_config(app, &window_config)?;
+
+    #[cfg(target_os = "macos")]
+    let builder = builder.traffic_light_position(tauri::LogicalPosition::new(16.0, 16.0));
+
+    builder.build()?;
+    Ok(())
+}
+
 fn setup_tray(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
+    use tauri::image::Image;
     use tauri::menu::{MenuBuilder, MenuItemBuilder};
     use tauri::tray::TrayIconBuilder;
 
@@ -257,13 +299,14 @@ fn setup_tray(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     let quit = MenuItemBuilder::with_id("quit", "Salir").build(app)?;
     let menu = MenuBuilder::new(app).items(&[&show, &quit]).build()?;
 
-    let icon = app
-        .default_window_icon()
-        .cloned()
-        .ok_or("No default window icon")?;
+    #[cfg(target_os = "macos")]
+    let icon = Image::from_bytes(include_bytes!("../icons/tray-template-runtime.png"))?;
+    #[cfg(not(target_os = "macos"))]
+    let icon = Image::from_bytes(include_bytes!("../icons/tray-color-runtime.png"))?;
 
     TrayIconBuilder::new()
         .icon(icon)
+        .icon_as_template(cfg!(target_os = "macos"))
         .menu(&menu)
         .show_menu_on_left_click(true)
         .on_menu_event(|app, event| match event.id.as_ref() {

@@ -106,9 +106,8 @@ pub async fn ensure_stt_binary(
         }
     }
 
-    let err = last_err.unwrap_or_else(|| {
-        anyhow!("No hay un binario oficial de nemo-speech para esta plataforma.")
-    });
+    let err =
+        last_err.unwrap_or_else(|| anyhow!(crate::codes::code("runtime.unsupported_platform")));
     set_error(&progress, &err.to_string());
     Err(err)
 }

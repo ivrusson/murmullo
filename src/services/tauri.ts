@@ -6,9 +6,12 @@ import type {
   AudioLevel,
   InsertionMode,
   AppConfig,
+  OverlayLayout,
+  OverlayStyle,
   RuntimeStatus,
   DictionaryEntry,
   MacosPermissionStatus,
+  LlmProviderInfo,
 } from '../types';
 
 export const audioService = {
@@ -64,6 +67,9 @@ export const runtimeService = {
   },
   async startLlm(): Promise<RuntimeStatus> {
     return await invoke('start_llm_runtime');
+  },
+  async listLlmProviders(): Promise<LlmProviderInfo[]> {
+    return await invoke('list_llm_providers');
   },
   async pipelineLogs(): Promise<import('../types').PipelineLogEntry[]> {
     return await invoke('get_pipeline_logs');
@@ -152,10 +158,12 @@ export const configService = {
   async updateRuntimeConfig(
     llmEnabled: boolean,
     llmModel: string,
-    defaultLanguage?: string
+    defaultLanguage?: string,
+    llmProvider?: string
   ): Promise<void> {
     return await invoke('update_runtime_config', {
       llmEnabled,
+      llmProvider,
       llmModel,
       defaultLanguage,
     });
@@ -175,10 +183,44 @@ export const configService = {
   async updateUiTheme(theme: 'light' | 'dark' | 'system'): Promise<void> {
     return await invoke('update_ui_theme', { theme });
   },
+  async updateUiLanguage(language: 'es' | 'en'): Promise<void> {
+    return await invoke('update_ui_language', { language });
+  },
   async registerGlobalShortcut(): Promise<void> {
     return await invoke('register_global_shortcut');
   },
   async unregisterGlobalShortcut(): Promise<void> {
     return await invoke('unregister_global_shortcut');
+  },
+};
+
+export const overlayService = {
+  async show(): Promise<void> {
+    return await invoke('create_floating_bar_window');
+  },
+  async savePosition(x: number, y: number): Promise<void> {
+    return await invoke('save_overlay_position', { x, y });
+  },
+  async getLayout(): Promise<OverlayLayout> {
+    return await invoke('get_overlay_layout');
+  },
+  async setCompact(compact: boolean): Promise<void> {
+    return await invoke('set_overlay_compact', { compact });
+  },
+  async setStyle(style: OverlayStyle): Promise<OverlayLayout> {
+    return await invoke('set_overlay_style', { style });
+  },
+  async resize(
+    width: number,
+    height: number,
+    x?: number,
+    y?: number
+  ): Promise<void> {
+    return await invoke('resize_overlay', {
+      width,
+      height,
+      x: x ?? null,
+      y: y ?? null,
+    });
   },
 };

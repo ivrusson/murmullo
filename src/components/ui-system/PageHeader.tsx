@@ -3,6 +3,8 @@ import * as stylex from '@stylexjs/stylex';
 import { color, font, space } from '@/styles/tokens.stylex';
 import { sx } from '@/components/ui-system/sx';
 
+const COMPACT = '@media (max-width: 960px)';
+
 const styles = stylex.create({
   wrap: {
     display: 'flex',
@@ -10,12 +12,21 @@ const styles = stylex.create({
     alignItems: 'flex-end',
     justifyContent: 'space-between',
     gap: space.md,
-    marginBottom: space.lg,
+    marginBottom: space.sm,
+    minWidth: 0,
+    flexShrink: 0,
+  },
+  copy: {
+    flex: '1',
+    minWidth: 0,
   },
   title: {
     fontFamily: font.display,
-    fontSize: '2rem',
-    fontWeight: 550,
+    fontSize: {
+      default: '2rem',
+      [COMPACT]: '1.65rem',
+    },
+    fontWeight: 500,
     letterSpacing: '-0.03em',
     lineHeight: 1.15,
     margin: 0,
@@ -25,15 +36,17 @@ const styles = stylex.create({
     marginTop: space.sm,
     marginBottom: 0,
     maxWidth: '38rem',
-    color: color.muted,
-    fontSize: '0.95rem',
-    lineHeight: 1.5,
+    color: '#5A5551',
+    fontFamily: font.sans,
+    fontSize: 14,
+    lineHeight: '22px',
   },
   actions: {
     display: 'flex',
     flexWrap: 'wrap',
     alignItems: 'center',
     gap: space.sm,
+    flexShrink: 0,
   },
 });
 
@@ -48,7 +61,7 @@ export function PageHeader({
 }) {
   return (
     <header {...sx(styles.wrap)}>
-      <div>
+      <div {...sx(styles.copy)}>
         <h1 {...sx(styles.title)}>{title}</h1>
         {lede ? <p {...sx(styles.lede)}>{lede}</p> : null}
       </div>

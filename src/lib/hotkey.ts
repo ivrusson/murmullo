@@ -1,3 +1,5 @@
+import { t } from '@/i18n';
+
 export const DEFAULT_PUSH_TO_TALK = 'Cmd+Option+T';
 
 const MODIFIER_DISPLAY: Record<string, string> = {
@@ -108,7 +110,7 @@ export function validateHotkey(
 ): string | null {
   const trimmed = binding.trim();
   if (!trimmed) {
-    return 'El atajo no puede estar vacío';
+    return t('hotkey.empty');
   }
 
   const tokens = trimmed
@@ -116,18 +118,18 @@ export function validateHotkey(
     .map(token => token.trim())
     .filter(Boolean);
   if (tokens.length < 2) {
-    return 'Incluye al menos un modificador y una tecla';
+    return t('hotkey.needsModifier');
   }
 
   const display = formatHotkey(trimmed);
   if (RESERVED.has(display)) {
-    return 'Ese atajo está reservado por el sistema';
+    return t('hotkey.reserved');
   }
 
   const normalized = display.toLowerCase();
   for (const other of occupied) {
     if (other && formatHotkey(other).toLowerCase() === normalized) {
-      return 'Ese atajo ya está asignado a otra acción';
+      return t('hotkey.conflict');
     }
   }
 

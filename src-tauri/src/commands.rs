@@ -48,7 +48,10 @@ pub struct AudioLevel {
 
 #[tauri::command]
 pub async fn get_app_info() -> Result<String, String> {
-    Ok("Murmullo v0.1.0 — desktop dictation wrapper".to_string())
+    Ok(format!(
+        "Murmullo v{} — desktop dictation wrapper",
+        env!("CARGO_PKG_VERSION")
+    ))
 }
 
 #[tauri::command]
@@ -68,7 +71,7 @@ pub async fn start_stt_runtime(state: State<'_, AppState>) -> Result<RuntimeStat
         let manager = state.model_manager.lock().map_err(|e| e.to_string())?;
         manager
             .get_model_path(PARAKEET_NAME)
-            .ok_or_else(|| "Ruta del modelo Parakeet no encontrada".to_string())?
+            .ok_or_else(|| crate::codes::code("model.path_missing"))?
     };
 
     let ready_url = {
@@ -112,7 +115,7 @@ pub async fn ensure_stt_runtime(state: State<'_, AppState>) -> Result<RuntimeSta
         runtime::set_progress(
             &install,
             "downloading_model",
-            "Descargando Parakeet Q8 (~714 MB)…",
+            &crate::codes::code("status.downloadingModel"),
             Some(0.0),
         );
         let name = PARAKEET_NAME.to_string();
@@ -128,13 +131,18 @@ pub async fn ensure_stt_runtime(state: State<'_, AppState>) -> Result<RuntimeSta
         mgr.mark_model_downloaded(&name);
     }
 
-    runtime::set_progress(&install, "starting", "Arrancando servidor STT…", None);
+    runtime::set_progress(
+        &install,
+        "starting",
+        &crate::codes::code("status.startingStt"),
+        None,
+    );
 
     let model_path = {
         let manager = state.model_manager.lock().map_err(|e| e.to_string())?;
         manager
             .get_model_path(PARAKEET_NAME)
-            .ok_or_else(|| "Ruta del modelo Parakeet no encontrada".to_string())?
+            .ok_or_else(|| crate::codes::code("model.path_missing"))?
     };
 
     let ready_url = {
@@ -168,12 +176,18 @@ pub async fn stop_stt_runtime(state: State<'_, AppState>) -> Result<RuntimeStatu
 
 #[tauri::command]
 pub async fn start_llm_runtime(state: State<'_, AppState>) -> Result<RuntimeStatus, String> {
-    let tags_url = {
+    let wait_url = {
         let mut runtime = state.runtime.lock().map_err(|e| e.to_string())?;
         runtime.start_llm().map_err(|e| e.to_string())?;
-        runtime.llm_tags_url()
+        if runtime.llm_is_server() {
+            Some(runtime.llm_tags_url())
+        } else {
+            None
+        }
     };
-    let _ = runtime::wait_http_ready(&tags_url, Duration::from_secs(20)).await;
+    if let Some(url) = wait_url {
+        let _ = runtime::wait_http_ready(&url, Duration::from_secs(20)).await;
+    }
     get_runtime_status(state).await
 }
 
@@ -306,12 +320,15 @@ pub async fn load_model(state: State<'_, AppState>, model_name: String) -> Resul
     let model_path = {
         let mut manager = state.model_manager.lock().map_err(|e| e.to_string())?;
         if !manager.is_model_downloaded(&name) {
-            return Err(format!("El modelo {} no está descargado.", name));
+            return Err(crate::codes::code_json(
+                "model.not_downloaded",
+                serde_json::json!({ "model": name }),
+            ));
         }
         manager.load_model(&name).map_err(|e| e.to_string())?;
         manager
             .get_model_path(&name)
-            .ok_or_else(|| "Ruta del modelo no encontrada".to_string())?
+            .ok_or_else(|| crate::codes::code("model.path_missing"))?
     };
     let ready_url = {
         let mut runtime = state.runtime.lock().map_err(|e| e.to_string())?;
@@ -340,6 +357,7 @@ pub fn start_push_to_talk(app: &tauri::AppHandle) {
         return;
     }
 
+    unhide_floating_bar(app);
     crate::pipeline::log("ptt", "hotkey pressed — starting capture");
     if let Err(e) = begin_recording(app) {
         PTT_HELD.store(false, Ordering::SeqCst);
@@ -387,8 +405,8 @@ fn finish_recording(app: &tauri::AppHandle, transcribe: bool) {
         let state = app.state::<AppState>();
         let mut capture = match state.audio_capture.lock() {
             Ok(guard) => guard,
-            Err(e) => {
-                emit_dictation_error(app, format!("No se pudo acceder al micrófono: {e}"));
+            Err(_e) => {
+                emit_dictation_error(app, crate::codes::code("audio.mic_access"));
                 return;
             }
         };
@@ -419,7 +437,7 @@ fn finish_recording(app: &tauri::AppHandle, transcribe: bool) {
         return;
     }
 
-    emit_processing(app, "Enviando a nemo-speech…");
+    emit_processing(app, &crate::codes::code("status.sendingStt"));
 
     let app = app.clone();
     tauri::async_runtime::spawn(async move {
@@ -442,13 +460,14 @@ fn begin_recording(app: &tauri::AppHandle) -> Result<(), String> {
         .find(|d| d.id == "default")
         .or_else(|| devices.first())
         .map(|d| d.id.clone())
-        .ok_or_else(|| "No hay micrófono disponible".to_string())?;
+        .ok_or_else(|| crate::codes::code("audio.no_device"))?;
 
     capture
         .select_device(&device_id)
         .map_err(|e| e.to_string())?;
     capture.start_recording().map_err(|e| e.to_string())?;
     drop(capture);
+    crate::insertion::remember_frontmost_target();
 
     let _ = app.emit(
         "recording-state-changed",
@@ -527,7 +546,7 @@ async fn run_transcription(
 ) -> Result<TranscriptionResult, String> {
     let state = app_handle.state::<AppState>();
     if audio_data.is_empty() {
-        return Err("No se recibió audio.".to_string());
+        return Err(crate::codes::code("audio.empty"));
     }
 
     let duration_seconds = audio_data.len() as f32 / 16000.0;
@@ -567,14 +586,12 @@ async fn run_transcription(
         format!("ready check GET {stt_url}/ready => {stt_ready} parakeet={model_ok}"),
     );
     if !stt_ready || !model_ok {
-        let reason = format!(
-            "nemo-speech no responde en {stt_url}/ready. Abre Runtimes y arranca el servidor."
-        );
+        let reason = crate::codes::code("runtime.not_ready");
         let _ = app_handle.emit("error-occurred", serde_json::json!({ "message": reason }));
         return Err(reason);
     }
 
-    emit_processing(&app_handle, "Preparando audio para nemo-speech…");
+    emit_processing(&app_handle, &crate::codes::code("status.preparingAudio"));
     let processed_audio = {
         let config = state.config.lock().map_err(|e| e.to_string())?;
         let mut audio_processor = state.audio_processor.lock().map_err(|e| e.to_string())?;
@@ -582,7 +599,7 @@ async fn run_transcription(
         audio_processor.process_audio(audio_data.clone())
     };
     if processed_audio.is_empty() {
-        return Err("Tras quitar silencio no queda audio útil.".to_string());
+        return Err(crate::codes::code("audio.silence_only"));
     }
 
     let language = {
@@ -601,7 +618,7 @@ async fn run_transcription(
     let raw = transcribe_with_runtime(&state, &processed_audio).await?;
     let raw = postprocess_transcription(raw);
     if raw.is_empty() {
-        let reason = "nemo-speech devolvió texto vacío.".to_string();
+        let reason = crate::codes::code("runtime.stt_empty");
         let _ = app_handle.emit("error-occurred", serde_json::json!({ "message": reason }));
         return Err(reason);
     }
@@ -612,9 +629,9 @@ async fn run_transcription(
     };
 
     if llm_enabled {
-        emit_processing(&app_handle, "Reescribiendo con LLM local…");
+        emit_processing(&app_handle, &crate::codes::code("status.llmRewrite"));
     } else {
-        emit_processing(&app_handle, "Diccionario y puntuación…");
+        emit_processing(&app_handle, &crate::codes::code("status.dictionary"));
     }
 
     let (final_text, llm_used) = postprocess_with_state(&state, &raw, llm_enabled).await?;
@@ -716,19 +733,25 @@ async fn postprocess_with_state(
         let dict = state.dictionary.lock().map_err(|e| e.to_string())?;
         return Ok(PostProcessor::run(raw, &dict, None));
     }
-    let (llm_url, llm_model) = {
+    let (llm_provider, llm_url, llm_model) = {
         let cfg = state.config.lock().map_err(|e| e.to_string())?;
-        (cfg.runtime.llm_url.clone(), cfg.runtime.llm_model.clone())
+        (
+            cfg.runtime.llm_provider.clone(),
+            cfg.runtime.llm_url.clone(),
+            cfg.runtime.llm_model.clone(),
+        )
     };
-    if !runtime::llm_has_model(&llm_url, &llm_model).await {
+    if !crate::llm::provider_has_model(&llm_provider, &llm_url, &llm_model).await {
         crate::pipeline::log(
             "llm",
-            format!("skip rewrite: {llm_model} not in {llm_url}/api/tags — pasting STT+dictionary"),
+            format!(
+                "skip rewrite: {llm_model} not ready on {llm_provider} — pasting STT+dictionary"
+            ),
         );
         let dict = state.dictionary.lock().map_err(|e| e.to_string())?;
         return Ok(PostProcessor::run(raw, &dict, None));
     }
-    let llm_rewrite = runtime::rewrite_with_llm_at(&llm_url, &llm_model, &prompt, &with_dict)
+    let llm_rewrite = crate::llm::rewrite(&llm_provider, &llm_url, &llm_model, &prompt, &with_dict)
         .await
         .ok();
     let dict = state.dictionary.lock().map_err(|e| e.to_string())?;
@@ -801,14 +824,71 @@ pub async fn update_audio_config(
 #[tauri::command]
 pub async fn update_runtime_config(
     llm_enabled: bool,
+    llm_provider: Option<String>,
     llm_model: String,
     default_language: Option<String>,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    let mut config = state.config.lock().map_err(|e| e.to_string())?;
-    config.update_runtime_config(llm_enabled, llm_model, default_language);
-    config.save().map_err(|e| e.to_string())?;
+    let provider = llm_provider.unwrap_or_else(|| "ollama".into());
+    let (provider, url, model) = {
+        let mut config = state.config.lock().map_err(|e| e.to_string())?;
+        config.update_runtime_config(
+            llm_enabled,
+            provider.clone(),
+            llm_model.clone(),
+            default_language,
+        );
+        config.save().map_err(|e| e.to_string())?;
+        (
+            config.runtime.llm_provider.clone(),
+            config.runtime.llm_url.clone(),
+            config.runtime.llm_model.clone(),
+        )
+    };
+    {
+        let mut runtime = state.runtime.lock().map_err(|e| e.to_string())?;
+        runtime.set_llm_config(provider, url, model);
+    }
     Ok(())
+}
+
+#[tauri::command]
+pub async fn list_llm_providers(
+    state: State<'_, AppState>,
+) -> Result<Vec<crate::llm::LlmProviderInfo>, String> {
+    let llm_url = {
+        let config = state.config.lock().map_err(|e| e.to_string())?;
+        config.runtime.llm_url.clone()
+    };
+    Ok(crate::llm::list_providers(&llm_url))
+}
+
+#[tauri::command]
+pub async fn rewrite_with_configured_llm(
+    system_prompt: String,
+    user_text: String,
+    state: State<'_, AppState>,
+) -> Result<Option<String>, String> {
+    let (enabled, provider, llm_url, llm_model) = {
+        let config = state.config.lock().map_err(|e| e.to_string())?;
+        (
+            config.runtime.llm_enabled,
+            config.runtime.llm_provider.clone(),
+            config.runtime.llm_url.clone(),
+            config.runtime.llm_model.clone(),
+        )
+    };
+    if !enabled {
+        return Ok(None);
+    }
+    if !crate::llm::provider_has_model(&provider, &llm_url, &llm_model).await {
+        return Ok(None);
+    }
+    Ok(
+        crate::llm::rewrite(&provider, &llm_url, &llm_model, &system_prompt, &user_text)
+            .await
+            .ok(),
+    )
 }
 
 #[tauri::command]
@@ -830,7 +910,7 @@ pub async fn update_ui_theme(
 ) -> Result<(), String> {
     match theme.as_str() {
         "light" | "dark" | "system" => {}
-        _ => return Err("Tema no válido. Usa light, dark o system".to_string()),
+        _ => return Err(crate::codes::code("theme.invalid")),
     }
 
     {
@@ -840,6 +920,27 @@ pub async fn update_ui_theme(
     }
 
     let _ = app_handle.emit("theme-updated", theme);
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn update_ui_language(
+    language: String,
+    app_handle: tauri::AppHandle,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    match language.as_str() {
+        "es" | "en" => {}
+        _ => return Err(crate::codes::code("locale.invalid")),
+    }
+
+    {
+        let mut config = state.config.lock().map_err(|e| e.to_string())?;
+        config.update_language(language.clone());
+        config.save().map_err(|e| e.to_string())?;
+    }
+
+    let _ = app_handle.emit("language-updated", language);
     Ok(())
 }
 
@@ -917,15 +1018,13 @@ pub async fn apply_correction(
 fn parse_ptt_shortcut(binding: &str) -> Result<Shortcut, String> {
     let binding = binding.trim();
     if binding.is_empty() {
-        return Err("El atajo no puede estar vacío".to_string());
+        return Err(crate::codes::code("hotkey.empty"));
     }
 
-    let shortcut = Shortcut::from_str(binding).map_err(|e| format!("Atajo no válido: {e}"))?;
+    let shortcut = Shortcut::from_str(binding).map_err(|_| crate::codes::code("hotkey.invalid"))?;
 
     if shortcut.mods.is_empty() {
-        return Err(
-            "El atajo necesita al menos un modificador (Cmd, Ctrl, Alt o Shift)".to_string(),
-        );
+        return Err(crate::codes::code("hotkey.needs_modifier"));
     }
 
     Ok(shortcut)
@@ -951,15 +1050,13 @@ pub fn apply_registered_shortcut(app: &tauri::AppHandle) -> Result<(), String> {
     }
 
     if !toggle.is_empty() && toggle.eq_ignore_ascii_case(&binding) {
-        return Err("Ese atajo ya está asignado a otra acción".to_string());
+        return Err(crate::codes::code("hotkey.conflict"));
     }
 
     let shortcut = parse_ptt_shortcut(&binding)?;
-    app.global_shortcut().register(shortcut).map_err(|e| {
-        format!(
-            "No se pudo registrar «{binding}». Puede estar en uso por el sistema u otra aplicación. ({e})"
-        )
-    })?;
+    app.global_shortcut()
+        .register(shortcut)
+        .map_err(|_| crate::codes::code("hotkey.register_failed"))?;
     Ok(())
 }
 
@@ -998,7 +1095,7 @@ pub async fn update_hotkey_config(
                 .toggle_recording
                 .eq_ignore_ascii_case(push_to_talk.trim())
         {
-            return Err("Ese atajo ya está asignado a otra acción".to_string());
+            return Err(crate::codes::code("hotkey.conflict"));
         }
         config.update_hotkey_config(push_to_talk.trim().to_string(), enabled);
         config.save().map_err(|e| e.to_string())?;
@@ -1029,6 +1126,14 @@ const FLOATING_BAR_WIDTH: f64 = 560.0;
 const FLOATING_BAR_HEIGHT: f64 = 168.0;
 const FLOATING_BAR_BOTTOM_MARGIN: f64 = 24.0;
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OverlayLayout {
+    pub x: Option<f64>,
+    pub y: Option<f64>,
+    pub compact: bool,
+    pub style: String,
+}
+
 fn floating_bar_anchor(app: &tauri::AppHandle) -> Result<(f64, f64), String> {
     let monitor = app
         .primary_monitor()
@@ -1046,20 +1151,84 @@ fn floating_bar_anchor(app: &tauri::AppHandle) -> Result<(f64, f64), String> {
     Ok((x, y))
 }
 
+fn overlay_saved_position(app: &tauri::AppHandle) -> Option<(f64, f64)> {
+    let state = app.state::<AppState>();
+    let config = state.config.lock().ok()?;
+    match (config.ui.overlay_x, config.ui.overlay_y) {
+        (Some(x), Some(y)) if x.is_finite() && y.is_finite() => Some((x, y)),
+        _ => None,
+    }
+}
+
+fn point_in_any_work_area(app: &tauri::AppHandle, x: f64, y: f64) -> bool {
+    let Ok(monitors) = app.available_monitors() else {
+        return false;
+    };
+    for monitor in monitors {
+        let scale = monitor.scale_factor();
+        if scale <= 0.0 {
+            continue;
+        }
+        let work = monitor.work_area();
+        let origin = work.position.to_logical::<f64>(scale);
+        let area = work.size.to_logical::<f64>(scale);
+        if x >= origin.x && y >= origin.y && x < origin.x + area.width && y < origin.y + area.height
+        {
+            return true;
+        }
+    }
+    false
+}
+
+/// Restore a saved overlay origin when it still sits on a monitor.
+/// Otherwise use bottom-center once and persist it so later shows do not re-anchor.
+fn resolve_overlay_position(app: &tauri::AppHandle) -> Result<(f64, f64, bool), String> {
+    if let Some((x, y)) = overlay_saved_position(app) {
+        if point_in_any_work_area(app, x, y) {
+            return Ok((x, y, false));
+        }
+    }
+    let (x, y) = floating_bar_anchor(app)?;
+    Ok((x, y, true))
+}
+
+fn persist_overlay_position(app: &tauri::AppHandle, x: f64, y: f64) -> Result<(), String> {
+    let state = app.state::<AppState>();
+    let mut config = state.config.lock().map_err(|e| e.to_string())?;
+    config.update_overlay_position(x, y);
+    config.save().map_err(|e| e.to_string())?;
+    Ok(())
+}
+
 fn show_floating_bar(win: &tauri::WebviewWindow) -> Result<(), String> {
-    let (x, y) = floating_bar_anchor(win.app_handle())?;
-    win.set_size(tauri::LogicalSize::new(
-        FLOATING_BAR_WIDTH,
-        FLOATING_BAR_HEIGHT,
-    ))
-    .map_err(|e| format!("set overlay size: {e}"))?;
+    let (x, y, persist) = resolve_overlay_position(win.app_handle())?;
     win.set_position(tauri::LogicalPosition::new(x, y))
         .map_err(|e| format!("set overlay position: {e}"))?;
+    if persist {
+        persist_overlay_position(win.app_handle(), x, y)?;
+    }
     win.set_always_on_top(true)
         .map_err(|e| format!("set overlay always-on-top: {e}"))?;
     let _ = win.set_skip_taskbar(true);
     win.show().map_err(|e| format!("show overlay: {e}"))?;
     Ok(())
+}
+
+/// Inverse of overlay Salir (`win.hide()`): reveal the existing window
+/// without recreating it or changing its saved position.
+fn unhide_floating_bar(app: &tauri::AppHandle) {
+    let handle = app.clone();
+    let _ = app.run_on_main_thread(move || {
+        let Some(win) = handle.get_webview_window(FLOATING_BAR_LABEL) else {
+            return;
+        };
+        if win.is_visible().unwrap_or(false) {
+            return;
+        }
+        if let Err(e) = win.show() {
+            eprintln!("⚠️ Could not show floating bar: {e}");
+        }
+    });
 }
 
 /// Create or reveal the isolated overlay on the calling thread.
@@ -1071,7 +1240,7 @@ pub fn ensure_floating_bar_window(app_handle: &tauri::AppHandle) -> Result<(), S
         return Ok(());
     }
 
-    let (x, y) = floating_bar_anchor(app_handle)?;
+    let (x, y, _) = resolve_overlay_position(app_handle)?;
     let win = tauri::WebviewWindowBuilder::new(
         app_handle,
         FLOATING_BAR_LABEL,
@@ -1103,6 +1272,130 @@ pub fn ensure_floating_bar_window(app_handle: &tauri::AppHandle) -> Result<(), S
 #[tauri::command]
 pub async fn create_floating_bar_window(app_handle: tauri::AppHandle) -> Result<(), String> {
     ensure_floating_bar_window(&app_handle)
+}
+
+#[tauri::command]
+pub async fn save_overlay_position(
+    x: f64,
+    y: f64,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    if !x.is_finite() || !y.is_finite() {
+        return Err(crate::codes::code("overlay.invalid_position"));
+    }
+    let mut config = state.config.lock().map_err(|e| e.to_string())?;
+    config.update_overlay_position(x, y);
+    config.save().map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+fn current_overlay_layout(config: &AppConfig) -> OverlayLayout {
+    OverlayLayout {
+        x: config.ui.overlay_x,
+        y: config.ui.overlay_y,
+        compact: config.ui.overlay_compact,
+        style: crate::config::normalize_overlay_style(&config.ui.overlay_style),
+    }
+}
+
+fn emit_overlay_layout(app_handle: &tauri::AppHandle, layout: &OverlayLayout) {
+    let _ = app_handle.emit("overlay-layout-updated", layout);
+}
+
+#[tauri::command]
+pub async fn get_overlay_layout(state: State<'_, AppState>) -> Result<OverlayLayout, String> {
+    let config = state.config.lock().map_err(|e| e.to_string())?;
+    Ok(current_overlay_layout(&config))
+}
+
+#[tauri::command]
+pub async fn set_overlay_compact(
+    compact: bool,
+    app_handle: tauri::AppHandle,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    let layout = {
+        let mut config = state.config.lock().map_err(|e| e.to_string())?;
+        config.update_overlay_compact(compact);
+        config.save().map_err(|e| e.to_string())?;
+        current_overlay_layout(&config)
+    };
+    emit_overlay_layout(&app_handle, &layout);
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn set_overlay_style(
+    style: String,
+    app_handle: tauri::AppHandle,
+    state: State<'_, AppState>,
+) -> Result<OverlayLayout, String> {
+    match style.as_str() {
+        "pill" | "island" | "card" => {}
+        _ => return Err(crate::codes::code("overlay.invalid_style")),
+    }
+
+    let layout = {
+        let mut config = state.config.lock().map_err(|e| e.to_string())?;
+        config.update_overlay_style(style);
+        config.save().map_err(|e| e.to_string())?;
+        current_overlay_layout(&config)
+    };
+    emit_overlay_layout(&app_handle, &layout);
+    Ok(layout)
+}
+
+#[tauri::command]
+pub async fn resize_overlay(
+    width: f64,
+    height: f64,
+    x: Option<f64>,
+    y: Option<f64>,
+    app_handle: tauri::AppHandle,
+) -> Result<(), String> {
+    if !width.is_finite() || !height.is_finite() || width <= 0.0 || height <= 0.0 {
+        return Err(crate::codes::code("overlay.invalid_size"));
+    }
+    if matches!(x, Some(v) if !v.is_finite()) || matches!(y, Some(v) if !v.is_finite()) {
+        return Err(crate::codes::code("overlay.invalid_position"));
+    }
+    let win = app_handle
+        .get_webview_window(FLOATING_BAR_LABEL)
+        .ok_or_else(|| crate::codes::code("overlay.unavailable"))?;
+
+    if x.is_none() && y.is_none() {
+        win.set_size(tauri::LogicalSize::new(width, height))
+            .map_err(|e| format!("set overlay size: {e}"))?;
+        return Ok(());
+    }
+
+    let scale = win.scale_factor().unwrap_or(1.0);
+    let scale = if scale > 0.0 { scale } else { 1.0 };
+    let current = win.outer_position().ok();
+    let current_x = current
+        .as_ref()
+        .map(|position| position.x as f64 / scale)
+        .unwrap_or(0.0);
+    let current_y = current
+        .as_ref()
+        .map(|position| position.y as f64 / scale)
+        .unwrap_or(0.0);
+    let next_x = x.unwrap_or(current_x);
+    let next_y = y.unwrap_or(current_y);
+    let moving_up = next_y < current_y - 0.5;
+
+    if moving_up {
+        win.set_position(tauri::LogicalPosition::new(next_x, next_y))
+            .map_err(|e| format!("set overlay position: {e}"))?;
+        win.set_size(tauri::LogicalSize::new(width, height))
+            .map_err(|e| format!("set overlay size: {e}"))?;
+    } else {
+        win.set_size(tauri::LogicalSize::new(width, height))
+            .map_err(|e| format!("set overlay size: {e}"))?;
+        win.set_position(tauri::LogicalPosition::new(next_x, next_y))
+            .map_err(|e| format!("set overlay position: {e}"))?;
+    }
+    Ok(())
 }
 
 #[tauri::command]

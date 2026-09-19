@@ -181,6 +181,50 @@ pegado.
 
 ---
 
+## 2026-09-19 — StyleX + Base UI, sin Tailwind
+
+**Contexto.** El repo llegó a tener Tailwind + Radix/shadcn. Duplicaba el sistema y dejaba deps
+muertas.
+
+**Decisión.** StyleX (`defineVars` + `create`) para shell, páginas y primitivas. Tokens apuntan a
+CSS custom properties que cargan la ventana principal y el overlay. Interactivos (Dialog, Popover,
+Switch, Select, Combobox, Toast) salen de Base UI y se estilan con StyleX.
+
+**Qué no.** Tailwind como puente. CSS global ad hoc como sistema.
+
+---
+
+## 2026-09-19 — TanStack Router (hash), no TanStack Start
+
+**Contexto.** Murmullo es un binario Tauri, no un servidor.
+
+**Decisión.** File-based TanStack Router con **hash history** (`#/historial`, `#/ajustes`).
+`defaultPreload: 'intent'`. **No** TanStack Start: no hay SSR ni `createServerFn`.
+
+**Por qué.** En `tauri://` los paths de History API se pelean con el filesystem. Rutas tipadas y
+deep-link de vistas sin fingir un Next.js.
+
+---
+
+## 2026-09-19 — Sin Convex
+
+**Decisión.** No aplica. Auth de macOS (mic, input monitoring, accesibilidad) vive en Rust.
+
+---
+
+## 2026-09-19 — Overlay sin Three.js; mascota en vez de membrana Booth
+
+**Contexto.** Un plan anterior pedía una membrana acústica de cobre (Three.js) y paleta Booth (tinta
+`#162028`, cobre `#C9955A`).
+
+**Decisión.** Overlay **sin** WebGL (ventana baja, barata). Companion vía `MurmulloView`: 2D en la
+píldora, 3D opcional en el sidebar. Tokens cerámicos de [DESIGN.md](../DESIGN.md) y
+`src/styles/tokens.stylex.ts`. Paleta Booth cobre/teal **descartada**.
+
+**Qué no.** Three.js en la píldora. VoiceChamber / membrana de cobre.
+
+---
+
 ## Orden del pipeline (vigente)
 
 ```

@@ -29,20 +29,8 @@ pub fn init(app: AppHandle) {
 }
 
 pub fn log_path() -> PathBuf {
-    #[cfg(target_os = "macos")]
-    {
-        return dirs::home_dir()
-            .unwrap_or_else(|| PathBuf::from("."))
-            .join("Library/Logs/murmullo/murmullo.log");
-    }
-    #[cfg(not(target_os = "macos"))]
-    {
-        dirs::data_dir()
-            .unwrap_or_else(|| PathBuf::from("."))
-            .join("murmullo")
-            .join("logs")
-            .join("murmullo.log")
-    }
+    crate::paths::ensure_layout();
+    crate::paths::log_file()
 }
 
 pub fn recent() -> Vec<PipelineLogEntry> {

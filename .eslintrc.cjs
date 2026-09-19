@@ -14,7 +14,15 @@ module.exports = {
     "@stylexjs/no-unused": "error",
     "react-refresh/only-export-components": [
       "warn",
-      { allowConstantExport: true },
+      {
+        allowConstantExport: true,
+        allowExportNames: [
+          "useLocale",
+          "useT",
+          "useAppTheme",
+          "useAppConfig",
+        ],
+      },
     ],
     "@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_" }],
     "@typescript-eslint/no-explicit-any": "warn",

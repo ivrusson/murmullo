@@ -1,14 +1,17 @@
+import { useEffect } from 'react';
 import { Link } from '@tanstack/react-router';
+import { FeedbackLaunchButtons } from '@/components/FeedbackDialog';
 import * as stylex from '@stylexjs/stylex';
 import { color, font, motion, radius, space } from '@/styles/tokens.stylex';
 import { sx } from '@/components/ui-system/sx';
-import { useAppConfig } from '@/contexts/AppConfigContext';
-import { formatHotkey } from '@/lib/hotkey';
 import { navItems } from '@/lib/nav';
-import { ThemeToggle } from '@/components/ThemeToggle';
-import { StatusDot } from '@/components/ui-system/StatusDot';
+import { MurmulloView } from '@/mascot/MurmulloView';
+import { useDictationScene } from '@/hooks/useDictationScene';
+import { startPendingContextSync } from '@/lib/pendingDictationContext';
+import { useT } from '@/i18n';
 
-const MOBILE = '@media (max-width: 860px)';
+const MOBILE = '@media (max-width: 720px)';
+const NARROW = '@media (max-width: 960px)';
 
 const styles = stylex.create({
   aside: {
@@ -17,62 +20,69 @@ const styles = stylex.create({
       [MOBILE]: 'auto',
     },
     width: {
-      default: 248,
+      default: 240,
+      [NARROW]: 200,
       [MOBILE]: '100%',
     },
     flexShrink: 0,
     display: 'flex',
     flexDirection: 'column',
-    justifyContent: 'space-between',
-    backgroundColor: color.surface,
-    borderRightColor: color.line,
-    borderRightStyle: 'solid',
-    borderRightWidth: {
-      default: 1,
+    backgroundColor: 'var(--brand-sidebar-veil)',
+    paddingLeft: {
+      default: 20,
+      [MOBILE]: 12,
+    },
+    paddingRight: {
+      default: 16,
+      [MOBILE]: 12,
+    },
+    paddingBottom: {
+      default: 20,
+      [MOBILE]: 8,
+    },
+    position: 'relative',
+    overflow: 'visible',
+  },
+  chrome: {
+    height: {
+      default: 44,
       [MOBILE]: 0,
     },
-    borderBottomColor: color.line,
-    borderBottomStyle: 'solid',
-    borderBottomWidth: {
-      default: 0,
-      [MOBILE]: 1,
+    flexShrink: 0,
+    display: {
+      default: 'block',
+      [MOBILE]: 'none',
     },
   },
   brand: {
     display: 'flex',
-    alignItems: 'center',
-    gap: space.md,
-    paddingInline: space.lg,
-    paddingTop: space.lg,
-    paddingBottom: space.md,
+    flexDirection: 'column',
+    gap: 2,
+    paddingInline: 4,
+    paddingTop: 8,
+    paddingBottom: 20,
   },
-  logo: {
-    width: 36,
-    height: 36,
-    borderRadius: radius.md,
+  brandRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+    color: color.ink,
   },
   name: {
     fontFamily: font.display,
-    fontSize: '1.35rem',
-    lineHeight: 1,
+    fontSize: 22,
+    fontWeight: 500,
+    letterSpacing: '-0.03em',
+    lineHeight: '26px',
     margin: 0,
     color: color.ink,
   },
   tag: {
     margin: 0,
-    marginTop: 4,
     color: color.muted,
-    fontSize: '0.75rem',
-  },
-  hotkey: {
-    marginInline: space.lg,
-    marginBottom: space.md,
-    padding: space.md,
-    borderRadius: radius.md,
-    backgroundColor: color.raised,
-    color: color.muted,
-    fontFamily: font.mono,
-    fontSize: '0.7rem',
+    fontFamily: font.sans,
+    fontSize: 12,
+    lineHeight: '16px',
   },
   nav: {
     display: 'flex',
@@ -81,7 +91,6 @@ const styles = stylex.create({
       [MOBILE]: 'row',
     },
     gap: 4,
-    paddingInline: space.sm,
     overflowX: {
       default: 'visible',
       [MOBILE]: 'auto',
@@ -94,10 +103,13 @@ const styles = stylex.create({
   item: {
     display: 'flex',
     alignItems: 'center',
-    gap: space.md,
-    paddingBlock: '0.6rem',
-    paddingInline: '0.85rem',
-    borderRadius: radius.md,
+    gap: 12,
+    height: {
+      default: 40,
+      [MOBILE]: 36,
+    },
+    paddingInline: 12,
+    borderRadius: radius.pill,
     color: {
       default: color.muted,
       ':hover': color.ink,
@@ -107,7 +119,10 @@ const styles = stylex.create({
       ':hover': color.raised,
     },
     textDecoration: 'none',
-    fontSize: '0.9rem',
+    fontFamily: font.sans,
+    fontSize: 14,
+    fontWeight: 400,
+    lineHeight: '20px',
     transitionProperty: 'background-color, color',
     transitionDuration: motion.fast,
     outlineColor: {
@@ -127,90 +142,145 @@ const styles = stylex.create({
       ':focus-visible': 2,
     },
     whiteSpace: {
-      default: 'normal',
+      default: 'nowrap',
       [MOBILE]: 'nowrap',
     },
   },
+  iconSlot: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 20,
+    height: 20,
+    flexShrink: 0,
+  },
   active: {
     color: {
-      default: color.copperInk,
-      ':hover': color.copperInk,
+      default: color.ink,
+      ':hover': color.ink,
     },
     backgroundColor: {
-      default: color.copper,
-      ':hover': color.copper,
+      default: color.navActive,
+      ':hover': color.navActive,
+    },
+    fontWeight: 500,
+    boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.75)',
+  },
+  spacer: {
+    flex: '1',
+    minHeight: 24,
+    display: {
+      default: 'block',
+      [MOBILE]: 'none',
     },
   },
-  foot: {
-    padding: space.lg,
+  companion: {
     display: {
       default: 'flex',
       [MOBILE]: 'none',
     },
     flexDirection: 'column',
-    gap: space.md,
+    alignItems: 'flex-start',
+    gap: 8,
+    paddingInline: 8,
+    paddingTop: 8,
+    paddingBottom: 20,
   },
-  mic: {
+  mascotHost: {
+    width: 88,
+    height: 88,
+    flexShrink: 0,
+    position: 'relative',
+  },
+  quote: {
+    margin: 0,
+    maxWidth: 160,
     color: color.muted,
-    fontSize: '0.75rem',
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-    whiteSpace: 'nowrap',
+    fontFamily: font.hand,
+    fontSize: 16,
+    fontWeight: 400,
+    lineHeight: '20px',
+    transform: 'rotate(-2deg)',
+    transformOrigin: 'center center',
+  },
+  feedback: {
+    display: 'flex',
+    flexDirection: 'row',
+    paddingTop: 4,
+  },
+  mobileFeedback: {
+    display: {
+      default: 'none',
+      [MOBILE]: 'flex',
+    },
+    paddingTop: space.sm,
+    paddingBottom: space.sm,
   },
 });
 
 export function Sidebar() {
-  const { selectedDevice, audioDevices, runtimeStatus, config } =
-    useAppConfig();
-  const deviceName =
-    audioDevices.find(d => d.id === selectedDevice)?.name ?? 'Sin micrófono';
-  const ready = Boolean(runtimeStatus?.dictation_ready);
-  const ptt = formatHotkey(config?.hotkeys.push_to_talk);
+  const mascotHost = sx(styles.mascotHost);
+  const { mode, level } = useDictationScene();
+  const t = useT();
+
+  useEffect(() => startPendingContextSync(), []);
 
   return (
     <aside {...sx(styles.aside)}>
-      <div>
-        <div {...sx(styles.brand)}>
-          <img
-            src="/murmullo-logo.svg"
-            alt=""
-            {...sx(styles.logo)}
-          />
-          <div>
-            <p {...sx(styles.name)}>Murmullo</p>
-            <p {...sx(styles.tag)}>Dictado local</p>
-          </div>
+      <div data-tauri-drag-region="" {...sx(styles.chrome)} />
+      <div {...sx(styles.brand)}>
+        <div {...sx(styles.brandRow)}>
+          <p {...sx(styles.name)}>Murmullo</p>
         </div>
-        <div {...sx(styles.hotkey)}>Atajo {ptt}</div>
-        <nav {...sx(styles.nav)} aria-label="Secciones">
-          {navItems.map(item => {
-            const Icon = item.icon;
-            return (
-              <Link
-                key={item.to}
-                to={item.to}
-                preload="intent"
-                activeOptions={{ exact: item.to === '/' }}
-                {...sx(styles.item)}
-                activeProps={{
-                  ...sx(styles.item, styles.active),
-                  'aria-current': 'page',
-                }}
-              >
-                <Icon size={16} aria-hidden />
-                {item.label}
-              </Link>
-            );
-          })}
-        </nav>
+        <p {...sx(styles.tag)}>{t('nav.tagline')}</p>
       </div>
-      <div {...sx(styles.foot)}>
-        <ThemeToggle compact />
-        <StatusDot
-          ready={ready}
-          label={ready ? 'Parakeet listo' : 'STT no listo'}
-        />
-        <div {...sx(styles.mic)}>{deviceName}</div>
+      <nav {...sx(styles.nav)} aria-label={t('nav.sections')}>
+        {navItems.map(item => {
+          const Icon = item.icon;
+          return (
+            <Link
+              key={item.to}
+              to={item.to}
+              preload="intent"
+              activeOptions={{ exact: item.to === '/' }}
+              {...sx(styles.item)}
+              activeProps={{
+                ...sx(styles.item, styles.active),
+                'aria-current': 'page',
+              }}
+            >
+              <span {...sx(styles.iconSlot)}>
+                <Icon size={18} strokeWidth={1.7} aria-hidden />
+              </span>
+              {t(item.labelKey)}
+            </Link>
+          );
+        })}
+      </nav>
+      <div {...sx(styles.mobileFeedback)}>
+        <FeedbackLaunchButtons compact />
+      </div>
+      <div {...sx(styles.spacer)} />
+      <div {...sx(styles.companion)}>
+        <div
+          id="sidebar-mascot"
+          className={['murmullo-mascot-host', mascotHost.className]
+            .filter(Boolean)
+            .join(' ')}
+          style={mascotHost.style}
+        >
+          <MurmulloView
+            kind="2d"
+            size={88}
+            interactive={false}
+            sceneMode={mode}
+            level={level}
+          />
+        </div>
+        <p {...sx(styles.quote)}>{t('nav.quote')}</p>
+        <div {...sx(styles.feedback)}>
+          <FeedbackLaunchButtons compact />
+        </div>
       </div>
     </aside>
   );

@@ -1,73 +1,97 @@
 import { useEffect, useState } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
-import { toast } from 'sonner';
+import { toast } from '@/components/ui-system/toast';
 import * as stylex from '@stylexjs/stylex';
 import { dictionaryService } from '@/services/tauri';
 import type { DictionaryEntry } from '@/types';
 import { PageFrame } from '@/components/ui-system/PageFrame';
 import { PageHeader } from '@/components/ui-system/PageHeader';
 import { Surface } from '@/components/ui-system/Surface';
-import { BoothButton } from '@/components/ui-system/BoothButton';
+import { Button } from '@/components/ui-system/Button';
 import { EmptyState } from '@/components/ui-system/EmptyState';
 import { color, font, radius, space } from '@/styles/tokens.stylex';
 import { sx } from '@/components/ui-system/sx';
+import { useT } from '@/i18n';
 
 const styles = stylex.create({
   grid: {
     display: 'grid',
     gridTemplateColumns: {
       default: '1fr 360px',
-      '@media (max-width: 1080px)': '1fr',
+      '@media (max-width: 1100px)': '1fr',
     },
     gap: space.md,
+    alignItems: 'start',
   },
   form: {
     display: 'flex',
     flexDirection: 'row',
     gap: space.sm,
     flexWrap: 'wrap',
+    marginBottom: space.md,
   },
   input: {
     flex: '1',
     minWidth: 140,
-    borderRadius: radius.md,
+    height: 36,
+    borderRadius: radius.pill,
     borderWidth: 0,
-    padding: '0.65rem 0.8rem',
+    paddingInline: '0.9rem',
     backgroundColor: color.raised,
     color: color.ink,
+    fontFamily: font.sans,
+    fontSize: 13,
   },
   kicker: {
     margin: 0,
     marginBottom: space.md,
-    color: color.copper,
-    fontSize: '0.8rem',
+    color: color.muted,
+    fontFamily: font.sans,
+    fontSize: 12,
+    fontWeight: 600,
+    letterSpacing: '0.02em',
+  },
+  rows: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 8,
   },
   row: {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: space.sm,
-    padding: space.md,
-    borderRadius: radius.md,
-    backgroundColor: color.raised,
-    marginBottom: space.sm,
+    paddingBlock: 14,
+    paddingInline: 16,
+    borderRadius: 20,
+    backgroundColor: '#FFFFFF',
+    borderColor: color.line,
+    borderStyle: 'solid',
+    borderWidth: 1,
   },
   term: {
-    fontFamily: font.mono,
+    fontFamily: font.sans,
     color: color.muted,
-    fontSize: '0.85rem',
+    fontSize: 13,
+  },
+  replacement: {
+    fontFamily: font.sans,
+    fontWeight: 600,
+    fontSize: 13,
+    color: color.ink,
   },
   prompt: {
     margin: 0,
     fontFamily: font.mono,
     fontSize: '0.7rem',
-    color: color.muted,
+    color: '#5A5551',
     whiteSpace: 'pre-wrap',
     lineHeight: 1.5,
   },
 });
 
 export function DictionaryPage() {
+  const t = useT();
   const [entries, setEntries] = useState<DictionaryEntry[]>([]);
   const [term, setTerm] = useState('');
   const [replacement, setReplacement] = useState('');
@@ -88,14 +112,14 @@ export function DictionaryPage() {
 
   const add = async () => {
     if (!term.trim() || !replacement.trim()) {
-      toast.error('Escribe el término oído y el reemplazo');
+      toast.error(t('dictionary.needBoth'));
       return;
     }
     await dictionaryService.add(term.trim(), replacement.trim());
     setTerm('');
     setReplacement('');
     await refresh();
-    toast.success('Diccionario actualizado');
+    toast.success(t('dictionary.updated'));
   };
 
   const remove = async (id: string) => {
@@ -105,55 +129,54 @@ export function DictionaryPage() {
 
   return (
     <PageFrame>
-      <PageHeader
-        title="Diccionario"
-        lede="Reemplazos deterministas antes del LLM. Cada cambio regenera el system prompt."
-      />
+      <PageHeader title={t('dictionary.title')} lede={t('dictionary.lede')} />
 
       <div {...sx(styles.grid)}>
         <Surface>
-          <p {...sx(styles.kicker)}>Nueva regla</p>
+          <p {...sx(styles.kicker)}>{t('dictionary.newRule')}</p>
           <div {...sx(styles.form)}>
             <input
               value={term}
               onChange={e => setTerm(e.target.value)}
-              placeholder="como lo oye el STT"
-              aria-label="Término oído"
+              placeholder={t('dictionary.heardPlaceholder')}
+              aria-label={t('dictionary.heardAria')}
               {...sx(styles.input)}
             />
             <input
               value={replacement}
               onChange={e => setReplacement(e.target.value)}
-              placeholder="reemplazo"
-              aria-label="Reemplazo"
+              placeholder={t('dictionary.replacementPlaceholder')}
+              aria-label={t('dictionary.replacementAria')}
               {...sx(styles.input)}
             />
-            <BoothButton onClick={() => void add()}>
-              <Plus size={14} /> Añadir
-            </BoothButton>
+            <Button onClick={() => void add()}>
+              <Plus size={14} strokeWidth={1.5} /> {t('dictionary.add')}
+            </Button>
           </div>
-          <div>
+          <div {...sx(styles.rows)}>
             {entries.length === 0 ? (
               <EmptyState
-                title="Sin reglas todavía"
-                body="Añade nombres, marcas o jerga que Parakeet suele transcribir mal."
+                title={t('dictionary.emptyTitle')}
+                body={t('dictionary.emptyBody')}
               />
             ) : (
               entries.map(entry => (
                 <div key={entry.id} {...sx(styles.row)}>
                   <div>
                     <span {...sx(styles.term)}>{entry.term}</span>
-                    <span> se convierte en </span>
-                    <span>{entry.replacement}</span>
+                    <span>{t('dictionary.becomes')}</span>
+                    <span {...sx(styles.replacement)}>{entry.replacement}</span>
                   </div>
-                  <BoothButton
-                    size="sm"
+                  <Button
+                    size="icon"
                     tone="danger"
                     onClick={() => void remove(entry.id)}
-                    aria-label={`Borrar ${entry.term}`}
+                    aria-label={t('dictionary.deleteTerm', {
+                      term: entry.term,
+                    })}
                   >
-                    <Trash2 size={14} />
-                  </BoothButton>
+                    <Trash2 size={14} strokeWidth={1.5} />
+                  </Button>
                 </div>
               ))
             )}
@@ -161,9 +184,9 @@ export function DictionaryPage() {
         </Surface>
 
         <Surface as="aside">
-          <p {...sx(styles.kicker)}>System prompt</p>
+          <p {...sx(styles.kicker)}>{t('dictionary.systemPrompt')}</p>
           <pre {...sx(styles.prompt)}>
-            {prompt || 'Se genera al añadir la primera regla.'}
+            {prompt || t('dictionary.promptEmpty')}
           </pre>
         </Surface>
       </div>

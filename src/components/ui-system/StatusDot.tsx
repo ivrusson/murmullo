@@ -15,16 +15,16 @@ const styles = stylex.create({
     flexShrink: 0,
   },
   live: {
-    backgroundColor: color.live,
+    backgroundColor: color.sage,
     boxShadow:
-      '0 0 0 4px color-mix(in srgb, var(--booth-live) 25%, transparent)',
+      '0 0 0 4px color-mix(in srgb, var(--color-sage) 22%, transparent)',
   },
   wait: {
-    backgroundColor: color.copper,
+    backgroundColor: color.iris,
   },
   label: {
     fontFamily: font.sans,
-    fontSize: '0.8rem',
+    fontSize: 13,
     color: color.ink,
   },
 });

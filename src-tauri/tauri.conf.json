@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Murmullo",
-  "version": "0.1.0",
+  "version": "0.7.0",
   "identifier": "com.murmullo.app",
   "build": {
     "beforeDevCommand": "pnpm dev",
@@ -13,7 +13,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "Murmullo - Voice Transcription",
+        "title": "Murmullo",
         "url": "index.html",
         "width": 1000,
         "height": 700,
@@ -21,7 +21,10 @@
         "resizable": true,
         "minWidth": 800,
         "minHeight": 600,
-        "center": true
+        "center": true,
+        "create": false,
+        "titleBarStyle": "Overlay",
+        "hiddenTitle": true
       },
       {
         "label": "floating-bar",
@@ -42,6 +45,20 @@
         "maximizable": false,
         "minimizable": false,
         "acceptFirstMouse": true
+      },
+      {
+        "label": "crash-reporter",
+        "title": "Murmullo",
+        "url": "crash.html",
+        "width": 520,
+        "height": 640,
+        "minWidth": 420,
+        "minHeight": 480,
+        "decorations": true,
+        "resizable": true,
+        "center": true,
+        "visible": false,
+        "create": false
       }
     ],
     "security": {

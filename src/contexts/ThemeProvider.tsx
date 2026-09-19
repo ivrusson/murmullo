@@ -52,7 +52,7 @@ function ThemeController({ children }: { children: ReactNode }) {
     <AppThemeContext.Provider
       value={{
         theme: normalizeTheme(theme),
-        resolvedTheme: resolvedTheme === 'light' ? 'light' : 'dark',
+        resolvedTheme: resolvedTheme === 'dark' ? 'dark' : 'light',
         setTheme: applyTheme,
       }}
     >
@@ -65,7 +65,7 @@ export function AppThemeProvider({ children }: { children: ReactNode }) {
   return (
     <NextThemesProvider
       attribute="class"
-      defaultTheme="dark"
+      defaultTheme="light"
       enableSystem
       disableTransitionOnChange
       storageKey={THEME_STORAGE_KEY}

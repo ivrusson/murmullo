@@ -47,14 +47,17 @@ impl AudioProcessor {
     /// Reject only near-empty clips. Quiet speech must still reach nemo-speech.
     pub fn has_sufficient_speech(&self, audio_data: &[f32]) -> Result<(), String> {
         if audio_data.is_empty() {
-            return Err("No se recibió audio.".to_string());
+            return Err(crate::codes::code("audio.empty"));
         }
 
         let duration = audio_data.len() as f32 / 16000.0;
         if duration < self.config.min_audio_length {
-            let reason = format!(
-                "Grabación demasiado corta ({:.1}s). Habla al menos {:.1}s.",
-                duration, self.config.min_audio_length
+            let reason = crate::codes::code_json(
+                "audio.too_short",
+                serde_json::json!({
+                    "seconds": format!("{:.1}", duration),
+                    "min": format!("{:.1}", self.config.min_audio_length),
+                }),
             );
             pipeline::log("ptt", format!("speech-gate REJECT {reason}"));
             return Err(reason);
@@ -89,9 +92,7 @@ impl AudioProcessor {
         );
 
         if voiced_frames < 3 && rms < 0.002 {
-            let reason =
-                "No se detectó voz. Habla más cerca del micrófono o usa Grabar en la píldora."
-                    .to_string();
+            let reason = crate::codes::code("audio.no_speech");
             pipeline::log(
                 "ptt",
                 "speech-gate REJECT no voiced frames — not sending empty clip to nemo-speech",

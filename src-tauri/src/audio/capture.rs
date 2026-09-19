@@ -7,7 +7,6 @@ use rubato::{
 use std::collections::VecDeque;
 use std::fs::File;
 use std::io::BufWriter;
-use std::path::Path;
 use std::sync::{Arc, Mutex};
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -43,7 +42,7 @@ impl AudioCapture {
             audio_buffer,
             is_recording,
             live_level,
-            sample_rate: 16000, // Whisper expects 16kHz
+            sample_rate: 16000, // STT expects 16 kHz
             needs_resampling: false,
             device_sample_rate: 0,
         })
@@ -157,7 +156,7 @@ impl AudioCapture {
 
         // Check if resampling is needed
         let device_sample_rate = config.sample_rate.0;
-        let target_sample_rate = 16000; // Whisper expects 16kHz
+        let target_sample_rate = 16000; // STT expects 16 kHz
 
         let needs_resampling = device_sample_rate != target_sample_rate;
 
@@ -398,12 +397,9 @@ impl AudioCapture {
             return Err(anyhow::anyhow!("Sample rate cannot be 0"));
         }
 
-        // Create recordings directory if it doesn't exist (outside src-tauri to avoid hot reload)
-        let recordings_dir = Path::new("../recordings");
-        if !recordings_dir.exists() {
-            std::fs::create_dir_all(recordings_dir)?;
-            println!("📁 Created recordings directory");
-        }
+        crate::paths::ensure_layout();
+        let recordings_dir = crate::paths::recordings_dir();
+        std::fs::create_dir_all(&recordings_dir)?;
 
         let file_path = recordings_dir.join(filename);
         let file = File::create(&file_path)?;

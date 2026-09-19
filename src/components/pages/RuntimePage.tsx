@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { Download, Play, Square, Shield, RotateCcw } from 'lucide-react';
-import { toast } from 'sonner';
+import { toast } from '@/components/ui-system/toast';
 import * as stylex from '@stylexjs/stylex';
 import { permissionService, runtimeService } from '@/services/tauri';
 import type { ComponentStatus } from '@/types';
@@ -10,10 +10,11 @@ import { PipelineLogPanel } from '@/components/PipelineLog';
 import { PageFrame } from '@/components/ui-system/PageFrame';
 import { PageHeader } from '@/components/ui-system/PageHeader';
 import { Surface } from '@/components/ui-system/Surface';
-import { BoothButton } from '@/components/ui-system/BoothButton';
+import { Button } from '@/components/ui-system/Button';
 import { Chip } from '@/components/ui-system/Chip';
 import { color, font, radius, space } from '@/styles/tokens.stylex';
 import { sx } from '@/components/ui-system/sx';
+import { useT, mapBackendError, translateBackendMessage } from '@/i18n';
 
 const styles = stylex.create({
   copy: {
@@ -48,9 +49,9 @@ const styles = stylex.create({
     color: color.muted,
     alignSelf: 'flex-start',
   },
-  live: { color: color.live },
+  live: { color: color.sage },
   danger: { color: color.danger },
-  copper: { color: color.copper },
+  iris: { color: color.iris },
   bar: {
     marginTop: 6,
     height: 6,
@@ -61,7 +62,7 @@ const styles = stylex.create({
   },
   fill: {
     height: '100%',
-    backgroundColor: color.copper,
+    backgroundColor: color.iris,
   },
   stepHead: {
     display: 'flex',
@@ -109,12 +110,12 @@ function StatusRow({
       ? styles.live
       : status.state === 'error'
         ? styles.danger
-        : styles.copper;
+        : styles.iris;
   return (
     <div {...sx(styles.row)}>
       <div>
         <p {...sx(styles.label)}>{label}</p>
-        <p {...sx(styles.msg)}>{status.message}</p>
+        <p {...sx(styles.msg)}>{translateBackendMessage(status.message)}</p>
         {status.progress != null ? (
           <div {...sx(styles.bar)}>
             <div
@@ -151,7 +152,24 @@ function Step({
   );
 }
 
+function providerLabel(id: string): string {
+  switch (id) {
+    case 'kimi':
+      return 'Kimi';
+    case 'kilo':
+    case 'kili':
+      return 'Kilo';
+    case 'cursor':
+      return 'Cursor';
+    case 'claude':
+      return 'Claude';
+    default:
+      return 'Ollama';
+  }
+}
+
 export function RuntimePage() {
+  const t = useT();
   const { runtimeStatus: status, refreshRuntime, config } = useAppConfig();
   const ptt = formatHotkey(config?.hotkeys.push_to_talk);
   const [busy, setBusy] = useState<string | null>(null);
@@ -192,7 +210,7 @@ export function RuntimePage() {
       await refreshRuntime();
       toast.success(label);
     } catch (error) {
-      toast.error(String(error));
+      toast.error(mapBackendError(error));
     } finally {
       setBusy(null);
       await refreshRuntime();
@@ -204,9 +222,9 @@ export function RuntimePage() {
     try {
       await runtimeService.ensureStt();
       await refreshRuntime();
-      toast.success('Dictado listo');
+      toast.success(t('runtime.readyToast'));
     } catch (error) {
-      toast.error(String(error));
+      toast.error(mapBackendError(error));
     } finally {
       setBusy(null);
       await refreshRuntime();
@@ -221,6 +239,10 @@ export function RuntimePage() {
     status?.llm_binary.state === 'ready' ||
     status?.llm_server.state === 'stopped';
   const llmStopped = status?.llm_server.state === 'stopped';
+  const llmIsServer = (status?.llm_kind ?? 'server') === 'server';
+  const llmProviderLabel = providerLabel(
+    status?.llm_provider ?? config?.runtime.llm_provider ?? 'ollama'
+  );
   const cliBusy =
     status?.stt_binary.state === 'downloading' ||
     status?.stt_model.state === 'downloading';
@@ -232,172 +254,187 @@ export function RuntimePage() {
 
   return (
     <PageFrame>
-      <PageHeader
-        title="Runtimes"
-        lede="Primera ejecución: Murmullo descarga nemo-speech y Parakeet Q8, luego arranca el STT en localhost. El LLM es opcional; el dictado funciona sin él."
-      />
+      <PageHeader title={t('runtime.title')} lede={t('runtime.lede')} />
 
       <div {...sx(styles.stack)}>
         {needsInstall ? (
           <Surface>
-            <p {...sx(styles.label)}>Instalación automática</p>
-            <p {...sx(styles.copy)}>
-              Un clic descarga el CLI oficial de NVIDIA (con SHA-256), el modelo
-              Parakeet Q8 (~714 MB) y arranca el servidor STT.
-            </p>
+            <p {...sx(styles.label)}>{t('runtime.autoInstall')}</p>
+            <p {...sx(styles.copy)}>{t('runtime.autoInstallBody')}</p>
             {cliBusy && status ? (
               <div>
                 {status.stt_binary.state === 'downloading' ? (
-                  <StatusRow label="CLI" status={status.stt_binary} />
+                  <StatusRow
+                    label={t('runtime.cli')}
+                    status={status.stt_binary}
+                  />
                 ) : null}
                 {status.stt_model.state === 'downloading' ? (
-                  <StatusRow label="Modelo" status={status.stt_model} />
+                  <StatusRow
+                    label={t('runtime.model')}
+                    status={status.stt_model}
+                  />
                 ) : null}
               </div>
             ) : null}
             <div {...sx(styles.actions)}>
-              <BoothButton
+              <Button
                 disabled={busy !== null}
                 onClick={() => void installAndStart()}
               >
-                <Download size={14} />
-                {busy === 'install' ? 'Instalando…' : 'Instalar y arrancar'}
-              </BoothButton>
+                <Download size={14} strokeWidth={1.5} />
+                {busy === 'install'
+                  ? t('runtime.installing')
+                  : t('runtime.installStart')}
+              </Button>
               {installError ? (
-                <BoothButton
+                <Button
                   tone="quiet"
                   disabled={busy !== null}
                   onClick={() => void installAndStart()}
                 >
-                  <RotateCcw size={14} /> Reintentar
-                </BoothButton>
+                  <RotateCcw size={14} strokeWidth={1.5} /> {t('runtime.retry')}
+                </Button>
               ) : null}
             </div>
           </Surface>
         ) : null}
 
-        <Step
-          n={1}
-          title="Permisos de sistema (mic, atajo, pegado)"
-          done={permsDone}
-        >
+        <Step n={1} title={t('runtime.stepPerms')} done={permsDone}>
+          <p {...sx(styles.copy)}>{t('runtime.stepPermsBody')}</p>
           <p {...sx(styles.copy)}>
-            El atajo se registra en macOS, igual que el micrófono. Sin
-            monitorización de entrada el comando no llega si otra app tiene el
-            foco. Sin accesibilidad el texto no se pega.
-          </p>
-          <p {...sx(styles.copy)}>
-            <Shield size={12} /> Mic: {micOk ? 'ok' : 'pendiente'} · Atajo:{' '}
-            {hotkeyOk ? 'ok' : 'pendiente'} · Pegado:{' '}
-            {accessOk ? 'ok' : 'pendiente'}. Concédelos en Permisos.
+            <Shield size={12} />{' '}
+            {t('runtime.permsLine', {
+              mic: micOk ? t('common.ok') : t('common.pending'),
+              hotkey: hotkeyOk ? t('common.ok') : t('common.pending'),
+              paste: accessOk ? t('common.ok') : t('common.pending'),
+            })}
           </p>
         </Step>
 
-        <Step n={2} title="CLI nemo-speech" done={!!cliReady}>
-          <p {...sx(styles.copy)}>
-            Se instala en Application Support de Murmullo. También se detecta si
-            ya está en PATH, NEMO_SPEECH_BIN, Homebrew o la instalación oficial
-            de NVIDIA.
-          </p>
+        <Step n={2} title={t('runtime.stepCli')} done={!!cliReady}>
+          <p {...sx(styles.copy)}>{t('runtime.stepCliBody')}</p>
           {status ? (
-            <StatusRow label="Binario" status={status.stt_binary} />
+            <StatusRow label={t('runtime.binary')} status={status.stt_binary} />
           ) : null}
           {cliReady ? null : (
-            <BoothButton
+            <Button
               disabled={busy !== null}
               onClick={() => void installAndStart()}
             >
-              <Download size={14} /> Instalar CLI
-            </BoothButton>
+              <Download size={14} strokeWidth={1.5} /> {t('runtime.installCli')}
+            </Button>
           )}
         </Step>
 
-        <Step n={3} title="Modelo Parakeet Q8 (~714 MB)" done={!!modelReady}>
-          {status ? <StatusRow label="GGUF" status={status.stt_model} /> : null}
-          {modelReady ? null : (
-            <BoothButton
-              disabled={busy !== null}
-              onClick={() => void installAndStart()}
-            >
-              <Download size={14} /> Descargar modelo
-            </BoothButton>
-          )}
-        </Step>
-
-        <Step n={4} title="Servidor STT en localhost:18765" done={!!sttReady}>
-          <p {...sx(styles.copy)}>
-            Cada dictado hace POST a /v1/audio/transcriptions (API compatible
-            OpenAI). stdout/stderr de nemo-speech se reenvían al panel de logs.
-          </p>
+        <Step n={3} title={t('runtime.stepModel')} done={!!modelReady}>
           {status ? (
-            <StatusRow label="nemo-speech serve" status={status.stt_server} />
+            <StatusRow label={t('runtime.gguf')} status={status.stt_model} />
+          ) : null}
+          {modelReady ? null : (
+            <Button
+              disabled={busy !== null}
+              onClick={() => void installAndStart()}
+            >
+              <Download size={14} strokeWidth={1.5} />{' '}
+              {t('runtime.downloadModel')}
+            </Button>
+          )}
+        </Step>
+
+        <Step n={4} title={t('runtime.stepStt')} done={!!sttReady}>
+          <p {...sx(styles.copy)}>{t('runtime.stepSttBody')}</p>
+          {status ? (
+            <StatusRow
+              label={t('runtime.sttServe')}
+              status={status.stt_server}
+            />
           ) : null}
           <div {...sx(styles.actions)}>
-            <BoothButton
+            <Button
               disabled={busy !== null || !modelReady || !cliReady}
-              onClick={() => void run('STT listo', () => runtimeService.startStt())}
+              onClick={() =>
+                void run(t('runtime.sttReady'), () => runtimeService.startStt())
+              }
             >
-              <Play size={14} /> Arrancar STT
-            </BoothButton>
-            <BoothButton
+              <Play size={14} strokeWidth={1.5} /> {t('runtime.startStt')}
+            </Button>
+            <Button
               tone="quiet"
               disabled={busy !== null}
-              onClick={() => void run('STT parado', () => runtimeService.stopStt())}
+              onClick={() =>
+                void run(t('runtime.sttStopped'), () =>
+                  runtimeService.stopStt()
+                )
+              }
             >
-              <Square size={14} /> Parar
-            </BoothButton>
+              <Square size={14} strokeWidth={1.5} /> {t('runtime.stop')}
+            </Button>
           </div>
         </Step>
 
-        <Step n={5} title="LLM local (opcional)" done={!!llmReady}>
+        <Step
+          n={5}
+          title={t('runtime.stepLlm', { provider: llmProviderLabel })}
+          done={!!llmReady}
+        >
           <p {...sx(styles.copy)}>
-            Se detecta Ollama en PATH, Homebrew, /usr/local/bin y Ollama.app. Si
-            no está, se pega el STT + diccionario.
+            {llmIsServer
+              ? t('runtime.llmServerBody')
+              : t('runtime.llmCliBody', { provider: llmProviderLabel })}
           </p>
           {status ? (
             <>
-              <StatusRow label="Ollama CLI" status={status.llm_binary} />
-              <StatusRow label="Servidor LLM" status={status.llm_server} />
               <StatusRow
-                label="Modelo LLM"
+                label={
+                  llmIsServer
+                    ? t('runtime.ollamaCli')
+                    : t('runtime.cliProvider', { provider: llmProviderLabel })
+                }
+                status={status.llm_binary}
+              />
+              <StatusRow
+                label={
+                  llmIsServer ? t('runtime.llmServer') : t('runtime.llmBackend')
+                }
+                status={status.llm_server}
+              />
+              <StatusRow
+                label={t('runtime.llmModel')}
                 status={
                   status.llm_model_status ?? {
                     state: 'missing',
-                    message: 'Sin datos',
+                    message: t('runtime.noData'),
                     progress: null,
                   }
                 }
               />
             </>
           ) : null}
-          {llmStopped ? (
-            <BoothButton
+          {llmStopped && llmIsServer ? (
+            <Button
               disabled={busy !== null}
               onClick={() =>
-                void run('LLM arrancado', () => runtimeService.startLlm())
+                void run(t('runtime.llmStarted'), () =>
+                  runtimeService.startLlm()
+                )
               }
             >
-              <Play size={14} /> Arrancar Ollama
-            </BoothButton>
+              <Play size={14} strokeWidth={1.5} /> {t('runtime.startOllama')}
+            </Button>
           ) : null}
           {!llmInstalled && !llmReady ? (
             <p {...sx(styles.copy)}>
-              Ollama no está en este Mac. Es opcional: el dictado ya funciona
-              con STT + diccionario.
+              {t('runtime.llmMissing', { provider: llmProviderLabel })}
             </p>
           ) : null}
           {llmReady && status?.llm_model_status?.state !== 'ready' ? (
-            <p {...sx(styles.copy)}>
-              Servidor detectado. El modelo configurado no está descargado; el
-              dictado sigue sin reescritura LLM.
-            </p>
+            <p {...sx(styles.copy)}>{t('runtime.llmModelMissing')}</p>
           ) : null}
         </Step>
 
         {status?.dictation_ready ? (
-          <Chip tone="live">
-            Dictado listo. Mantén {ptt}, habla y suelta.
-          </Chip>
+          <Chip tone="live">{t('runtime.readyChip', { ptt })}</Chip>
         ) : null}
 
         <PipelineLogPanel />
