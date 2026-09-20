@@ -19,6 +19,9 @@
     "offline",
     "desktop"
   ],
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",

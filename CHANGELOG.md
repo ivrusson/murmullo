@@ -9,6 +9,13 @@ Murmullo is still **beta**. Versions stay on the `0.x` line until the product is
 
 ## [Unreleased]
 
+### Added
+
+- Guided `install.sh` / `install.command` (macOS, Linux) and `install.ps1` / `install.cmd` (Windows)
+  so cloning the repo is enough to get a toolchain before native OS packages exist
+- README screenshot, usage, roadmap, and acknowledgments for the open-source stack
+- [docs/INSTALL.md](docs/INSTALL.md) with installer flags and first-run troubleshooting
+
 ## [0.7.0] - 2026-09-19
 
 GitHub-bound feedback and a crash reporter that still works if React is dead.
