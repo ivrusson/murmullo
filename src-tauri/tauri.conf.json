@@ -49,7 +49,7 @@
       {
         "label": "crash-reporter",
         "title": "Murmullo",
-        "url": "crash.html",
+        "url": "crash://localhost/",
         "width": 520,
         "height": 640,
         "minWidth": 420,

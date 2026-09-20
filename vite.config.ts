@@ -49,7 +49,6 @@ export default defineConfig({
       input: {
         main: path.resolve(__dirname, 'index.html'),
         floatingBar: path.resolve(__dirname, 'floating-bar.html'),
-        crashReporter: path.resolve(__dirname, 'crash.html'),
       },
     },
   },

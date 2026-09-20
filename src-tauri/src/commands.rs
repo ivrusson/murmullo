@@ -1261,6 +1261,7 @@ pub fn ensure_floating_bar_window(app_handle: &tauri::AppHandle) -> Result<(), S
     .position(x, y)
     .prevent_overflow()
     .user_agent("MurmulloFloatingBar/1.0")
+    .initialization_script(crate::crash::FRONTEND_CAPTURE_SCRIPT)
     .build()
     .map_err(|e| format!("create overlay window: {e}"))?;
 

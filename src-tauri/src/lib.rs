@@ -136,6 +136,7 @@ pub fn run() {
                 })
                 .build(),
         )
+        .register_uri_scheme_protocol("crash", crate::crash::serve_crash_html)
         .manage(app_state)
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
@@ -265,6 +266,7 @@ pub fn run() {
             crate::crash::get_pending_crash,
             crate::crash::clear_pending_crash,
             crate::crash::show_crash_reporter_window,
+            crate::crash::close_crash_reporter_window,
             crate::crash::report_frontend_crash,
         ])
         .run(tauri::generate_context!())
@@ -281,7 +283,8 @@ fn create_main_window(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>
         .cloned()
         .ok_or("missing main window config")?;
 
-    let builder = tauri::WebviewWindowBuilder::from_config(app, &window_config)?;
+    let builder = tauri::WebviewWindowBuilder::from_config(app, &window_config)?
+        .initialization_script(crate::crash::FRONTEND_CAPTURE_SCRIPT);
 
     #[cfg(target_os = "macos")]
     let builder = builder.traffic_light_position(tauri::LogicalPosition::new(16.0, 16.0));

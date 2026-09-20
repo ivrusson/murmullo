@@ -20,9 +20,14 @@
     }
   },
   "hooks": {
-    "before:init": ["echo '🚀 Starting release process...'"],
-    "after:bump": ["echo '📦 Version bumped to ${version}'"],
-    "before:release": ["echo '🔨 Building application...'", "pnpm run build", "pnpm tauri build"],
-    "after:release": ["echo '✅ Release v${version} completed successfully!'"]
+    "before:init": ["echo 'Starting release…'"],
+    "before:bump": ["node scripts/assert-beta-version.mjs ${version}"],
+    "after:bump": [
+      "node scripts/promote-changelog.mjs ${version}",
+      "node scripts/sync-cargo-lock-version.mjs ${version}",
+      "echo 'Version bumped to ${version}'"
+    ],
+    "before:release": ["sh scripts/release-build.sh"],
+    "after:release": ["echo 'Release v${version} completed'"]
   }
 }
