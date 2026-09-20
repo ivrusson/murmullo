@@ -4,12 +4,6 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Murmullo</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=Plus+Jakarta+Sans:wght@400;500;600&display=swap"
-      rel="stylesheet"
-    />
     <script>
       (function () {
         try {
@@ -24,7 +18,6 @@
         }
       })();
     </script>
-    <link rel="stylesheet" href="/src/styles/globals.css" />
     <style>
       :root {
         --crash-bg: #f5f2eb;
@@ -49,9 +42,9 @@
       body {
         margin: 0;
         min-height: 100%;
-        background: var(--color-bg, var(--crash-bg));
-        color: var(--color-ink, var(--crash-ink));
-        font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+        background: var(--crash-bg);
+        color: var(--crash-ink);
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
       }
       body {
         padding: 28px;
@@ -65,7 +58,7 @@
       }
       h1 {
         margin: 0;
-        font-family: Fraunces, Georgia, serif;
+        font-family: ui-serif, Georgia, serif;
         font-size: 1.75rem;
         letter-spacing: -0.02em;
       }
@@ -73,12 +66,12 @@
       .hint,
       .status {
         margin: 0;
-        color: var(--color-muted, var(--crash-muted));
+        color: var(--crash-muted);
         font-size: 13px;
         line-height: 1.5;
       }
       .status[data-tone='error'] {
-        color: var(--color-danger, var(--crash-danger));
+        color: var(--crash-danger);
       }
       .message {
         margin: 0;
@@ -93,8 +86,8 @@
         overflow: auto;
         padding: 12px;
         border-radius: 12px;
-        background: var(--color-surface, var(--crash-surface));
-        border: 1px solid var(--color-line, var(--crash-line));
+        background: var(--crash-surface);
+        border: 1px solid var(--crash-line);
         font-size: 11px;
         line-height: 1.4;
         white-space: pre-wrap;
@@ -112,8 +105,8 @@
         min-height: 88px;
         resize: vertical;
         border-radius: 12px;
-        border: 1px solid var(--color-line, var(--crash-line));
-        background: var(--color-surface, var(--crash-surface));
+        border: 1px solid var(--crash-line);
+        background: var(--crash-surface);
         color: inherit;
         font: inherit;
         font-size: 13px;
@@ -144,12 +137,12 @@
         cursor: not-allowed;
       }
       .primary {
-        background: var(--color-ink, var(--crash-ink));
-        color: var(--color-surface, var(--crash-surface));
+        background: var(--crash-ink);
+        color: var(--crash-surface);
       }
       .quiet {
         background: transparent;
-        border-color: var(--color-line, var(--crash-line));
+        border-color: var(--crash-line);
         color: inherit;
       }
     </style>
@@ -172,6 +165,275 @@
       <p class="hint" id="hint"></p>
       <p class="status" id="status"></p>
     </main>
-    <script type="module" src="/src/crash-reporter.ts"></script>
+    <script>
+      (function () {
+        var GITHUB_ISSUES_NEW = 'https://github.com/ivrusson/murmullo/issues/new';
+        var CRASH_TEMPLATE = 'crash_report.yml';
+        var MAX_URL_LENGTH = 6500;
+        var copy = {
+          es: {
+            title: 'Murmullo se detuvo',
+            lede: 'Puedes enviar el fallo a GitHub. No se adjunta audio ni dictados. Nada se envía hasta que confirmes en el navegador.',
+            comment: 'Qué estabas haciendo (opcional)',
+            commentPlaceholder: 'Por ejemplo: solté el atajo con Slack en primer plano.',
+            send: 'Enviar a GitHub',
+            copy: 'Copiar',
+            dismiss: 'Descartar',
+            hint: 'Si no tienes cuenta de GitHub, copia el informe y pégalo más tarde.',
+            empty: 'No hay un informe pendiente.',
+            sent: 'Se abrió GitHub. Revisa el formulario y pulsa Submit.',
+            copied: 'Informe copiado.',
+            failed: 'No se pudo abrir GitHub. Copia el informe.',
+            copyFailed: 'No se pudo copiar.',
+            ipc: 'No se pudo hablar con la app. El informe sigue en ~/.murmullo/crash-pending.json.',
+          },
+          en: {
+            title: 'Murmullo stopped',
+            lede: 'You can send this crash to GitHub. Audio and dictations are not attached. Nothing is sent until you confirm in the browser.',
+            comment: 'What you were doing (optional)',
+            commentPlaceholder: 'For example: I released the shortcut with Slack focused.',
+            send: 'Send to GitHub',
+            copy: 'Copy',
+            dismiss: 'Dismiss',
+            hint: 'If you do not have a GitHub account, copy the report and paste it later.',
+            empty: 'There is no pending report.',
+            sent: 'GitHub opened. Review the form and press Submit.',
+            copied: 'Report copied.',
+            failed: 'Could not open GitHub. Copy the report instead.',
+            copyFailed: 'Could not copy.',
+            ipc: 'Could not talk to the app. The report is still in ~/.murmullo/crash-pending.json.',
+          },
+        };
+
+        function localeOf(value) {
+          return value && String(value).toLowerCase().indexOf('en') === 0 ? 'en' : 'es';
+        }
+
+        function $(id) {
+          var node = document.getElementById(id);
+          if (!node) throw new Error('Missing #' + id);
+          return node;
+        }
+
+        function setStatus(text, tone) {
+          var status = $('status');
+          status.textContent = text;
+          status.dataset.tone = tone || 'info';
+        }
+
+        function clip(text, max) {
+          if (!text || text.length <= max) return text;
+          var marker = '\n…(truncated)';
+          return text.slice(0, Math.max(0, max - marker.length)) + marker;
+        }
+
+        function crashTitle(crash) {
+          var message = crash.message.replace(/\s+/g, ' ').trim();
+          var clipped = message.length > 72 ? message.slice(0, 69) + '…' : message;
+          return '[Crash]: ' + (clipped || crash.source);
+        }
+
+        function fieldsFrom(crash, comment) {
+          var note = comment.trim();
+          var description = note
+            ? note
+            : crash.source === 'rust-panic'
+              ? 'Rust panic: ' + crash.message
+              : crash.message;
+          return {
+            title: crashTitle(crash),
+            description: description,
+            environment: crash.environment,
+            stack: [crash.message, crash.stack].filter(Boolean).join('\n\n'),
+            actual: crash.message,
+          };
+        }
+
+        function buildUrl(fields) {
+          var params = new URLSearchParams();
+          params.set('template', CRASH_TEMPLATE);
+          if (fields.title) params.set('title', fields.title);
+          ['description', 'environment', 'stack', 'actual'].forEach(function (id) {
+            if (fields[id] && String(fields[id]).trim()) params.set(id, fields[id]);
+          });
+          return GITHUB_ISSUES_NEW + '?' + params.toString();
+        }
+
+        function buildFeedbackUrl(fields) {
+          var next = {
+            title: fields.title,
+            description: clip(fields.description, 2500),
+            environment: clip(fields.environment, 1500),
+            stack: clip(fields.stack, 4000),
+            actual: fields.actual,
+          };
+          var url = buildUrl(next);
+          while (url.length > MAX_URL_LENGTH) {
+            if (next.stack && next.stack.length > 240) {
+              next.stack = clip(next.stack, Math.floor(next.stack.length * 0.65));
+              url = buildUrl(next);
+              continue;
+            }
+            if (next.description && next.description.length > 240) {
+              next.description = clip(
+                next.description,
+                Math.floor(next.description.length * 0.65)
+              );
+              url = buildUrl(next);
+              continue;
+            }
+            break;
+          }
+          return url;
+        }
+
+        function buildMarkdown(fields) {
+          var lines = ['# Crash report', ''];
+          if (fields.title) lines.push('**Title:** ' + fields.title, '');
+          [
+            ['Description', fields.description],
+            ['Actual', fields.actual],
+            ['Environment', fields.environment],
+            ['Stack', fields.stack],
+          ].forEach(function (pair) {
+            if (!pair[1] || !String(pair[1]).trim()) return;
+            lines.push('## ' + pair[0], '', '```', String(pair[1]).trim(), '```', '');
+          });
+          lines.push('Open: ' + GITHUB_ISSUES_NEW + '?template=' + CRASH_TEMPLATE);
+          return lines.join('\n');
+        }
+
+        function waitForInvoke(timeoutMs) {
+          return new Promise(function (resolve, reject) {
+            var start = Date.now();
+            (function tick() {
+              var internals = window.__TAURI_INTERNALS__;
+              if (internals && typeof internals.invoke === 'function') {
+                return resolve(function (cmd, args) {
+                  return internals.invoke(cmd, args);
+                });
+              }
+              if (Date.now() - start > timeoutMs) {
+                return reject(new Error('ipc-timeout'));
+              }
+              setTimeout(tick, 20);
+            })();
+          });
+        }
+
+        function copyText(text) {
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            return navigator.clipboard.writeText(text);
+          }
+          return Promise.reject(new Error('clipboard'));
+        }
+
+        function applyCopy(lang) {
+          var t = copy[lang];
+          document.documentElement.lang = lang;
+          $('title').textContent = t.title;
+          $('lede').textContent = t.lede;
+          $('comment-label').textContent = t.comment;
+          $('comment').placeholder = t.commentPlaceholder;
+          $('send').textContent = t.send;
+          $('copy').textContent = t.copy;
+          $('dismiss').textContent = t.dismiss;
+          $('hint').textContent = t.hint;
+          return t;
+        }
+
+        function wireEmpty(t, invoke) {
+          $('message').textContent = t.empty;
+          $('send').disabled = true;
+          $('copy').disabled = true;
+          $('dismiss').addEventListener('click', function () {
+            invoke('close_crash_reporter_window').catch(function () {
+              window.close();
+            });
+          });
+        }
+
+        function wireCrash(crash, t, invoke) {
+          $('message').textContent = crash.message;
+          if (crash.stack) {
+            var stack = $('stack');
+            stack.hidden = false;
+            stack.textContent = crash.stack;
+          }
+
+          var send = $('send');
+          var copyBtn = $('copy');
+          var dismiss = $('dismiss');
+          var comment = $('comment');
+
+          send.addEventListener('click', function () {
+            send.disabled = true;
+            var url = buildFeedbackUrl(fieldsFrom(crash, comment.value));
+            invoke('plugin:opener|open_url', { url: url })
+              .then(function () {
+                return invoke('clear_pending_crash');
+              })
+              .then(function () {
+                setStatus(t.sent);
+                setTimeout(function () {
+                  invoke('close_crash_reporter_window').catch(function () {
+                    window.close();
+                  });
+                }, 800);
+              })
+              .catch(function () {
+                send.disabled = false;
+                setStatus(t.failed, 'error');
+              });
+          });
+
+          copyBtn.addEventListener('click', function () {
+            copyText(buildMarkdown(fieldsFrom(crash, comment.value)))
+              .then(function () {
+                setStatus(t.copied);
+              })
+              .catch(function () {
+                setStatus(t.copyFailed, 'error');
+              });
+          });
+
+          dismiss.addEventListener('click', function () {
+            invoke('clear_pending_crash')
+              .catch(function () {})
+              .then(function () {
+                return invoke('close_crash_reporter_window');
+              })
+              .catch(function () {
+                window.close();
+              });
+          });
+        }
+
+        waitForInvoke(4000)
+          .then(function (invoke) {
+            return invoke('get_pending_crash').then(function (crash) {
+              var lang = localeOf(
+                (crash && crash.locale) || localStorage.getItem('murmullo-locale')
+              );
+              var t = applyCopy(lang);
+              if (!crash) {
+                wireEmpty(t, invoke);
+                return;
+              }
+              wireCrash(crash, t, invoke);
+            });
+          })
+          .catch(function () {
+            var t = applyCopy(localeOf(localStorage.getItem('murmullo-locale')));
+            $('message').textContent = t.ipc;
+            $('send').disabled = true;
+            $('copy').disabled = true;
+            $('dismiss').addEventListener('click', function () {
+              window.close();
+            });
+            setStatus(t.ipc, 'error');
+          });
+      })();
+    </script>
   </body>
 </html>

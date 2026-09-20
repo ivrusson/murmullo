@@ -8,9 +8,12 @@ type CrashWindow = Window & {
 
 function isCrashReporterWindow(): boolean {
   if (typeof window === 'undefined') return false;
-  const path = window.location.pathname;
   const href = window.location.href;
-  return path.endsWith('crash.html') || href.includes('crash.html');
+  return (
+    window.location.protocol === 'crash:' ||
+    href.includes('crash.html') ||
+    window.location.pathname.endsWith('crash.html')
+  );
 }
 
 let reporting = false;

@@ -9,6 +9,11 @@ Murmullo is still **beta**. Versions stay on the `0.x` line until the product is
 
 ## [Unreleased]
 
+### Fixed
+
+- Crash reporter is a self-contained `crash://` page (no Vite, no Google Fonts). If the dev server
+  dies, the pending report in `~/.murmullo` still opens.
+
 ## [0.7.0] - 2026-09-19
 
 GitHub-bound feedback and a crash reporter that still works if React is dead.
