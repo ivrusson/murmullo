@@ -18,6 +18,8 @@ Murmullo is still **beta**. Versions stay on the `0.x` line until the product is
 
 - `pnpm release:dry` promotes Keep a Changelog, bumps package/Cargo/tauri versions, and skips the
   Tauri build. Real releases still refuse 1.x while we are in beta.
+- `pnpm changelog` drafts Unreleased notes with `cursor-agent` (Keep a Changelog). Do not use
+  conventional-changelog.
 
 ## [0.7.0] - 2026-09-19
 
