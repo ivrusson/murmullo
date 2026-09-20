@@ -1,52 +1,73 @@
-import { defineConfig } from "vite";
-import react from "@vitejs/plugin-react";
-import tailwindcss from "@tailwindcss/vite";
-import path from "path";
-import { fileURLToPath } from "url";
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+import stylex from '@stylexjs/unplugin';
+import tanstackRouter from '@tanstack/router-plugin/vite';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
 const host = process.env.TAURI_DEV_HOST;
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-// https://vitejs.dev/config/
-export default defineConfig(async () => ({
-  plugins: [tailwindcss(), react()],
+export default defineConfig({
+  plugins: [
+    stylex.vite({
+      useCSSLayers: true,
+      dev: process.env.NODE_ENV === 'development',
+      runtimeInjection: false,
+      aliases: {
+        '@/*': path.join(__dirname, 'src/*'),
+      },
+      unstable_moduleResolution: {
+        type: 'commonJS',
+        rootDir: __dirname,
+      },
+      cssInjectionTarget: (fileName: string) => fileName.includes('globals'),
+    }),
+    tanstackRouter({
+      target: 'react',
+      autoCodeSplitting: true,
+      routesDirectory: './src/routes',
+      generatedRouteTree: './src/routeTree.gen.ts',
+      quoteStyle: 'single',
+      semicolons: true,
+    }),
+    react(),
+  ],
   resolve: {
     alias: {
-      "@": path.resolve(__dirname, "./src"),
+      '@': path.resolve(__dirname, './src'),
     },
   },
-
-  // Multi-page build configuration for multiple windows
+  optimizeDeps: {
+    // Avoid a StyleX/Vite crawl deadlock that never commits `.vite/deps`.
+    holdUntilCrawlEnd: false,
+    exclude: ['@tauri-apps/api'],
+  },
   build: {
     rollupOptions: {
       input: {
         main: path.resolve(__dirname, 'index.html'),
         floatingBar: path.resolve(__dirname, 'floating-bar.html'),
+        crashReporter: path.resolve(__dirname, 'crash.html'),
       },
     },
   },
-
-  // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
-  //
-  // 1. prevent vite from obscuring rust errors
   clearScreen: false,
-  // 2. tauri expects a fixed port, fail if that port is not available
   server: {
     port: 1420,
     strictPort: true,
     host: host || false,
     hmr: host
       ? {
-          protocol: "ws",
+          protocol: 'ws',
           host,
           port: 1421,
         }
       : undefined,
     watch: {
-      // 3. tell vite to ignore watching `src-tauri` and only watch src/ directory
-      ignored: ["**/src-tauri/**", "**/node_modules/**", "**/dist/**"],
-      include: ["src/**/*"],
+      ignored: ['**/src-tauri/**', '**/node_modules/**', '**/dist/**'],
+      include: ['src/**/*'],
     },
   },
-}));
+});

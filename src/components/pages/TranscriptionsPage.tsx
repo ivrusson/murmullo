@@ -1,207 +1,569 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { getRouteApi, useNavigate } from '@tanstack/react-router';
 import { listen } from '@tauri-apps/api/event';
-import { Container, Section, Flex } from '@/components/layout';
-import { Badge } from '@/components/ui';
-import { Heading, Text } from '@/components/ui';
-import { useTranscriptionHistory } from '../../hooks/useTranscriptionHistory';
-import { TranscriptionRecord } from '../../types/transcription';
-import { Copy, Trash2, Download } from 'lucide-react';
+import {
+  Copy,
+  Trash2,
+  Download,
+  ClipboardPaste,
+  SpellCheck,
+  Search,
+  X,
+} from 'lucide-react';
+import { toast } from '@/components/ui-system/toast';
+import * as stylex from '@stylexjs/stylex';
+import { useTranscriptionHistory } from '@/hooks/useTranscriptionHistory';
+import { insertionService, dictionaryService } from '@/services/tauri';
+import { useAppConfig } from '@/contexts/AppConfigContext';
+import { formatHotkey } from '@/lib/hotkey';
+import {
+  firstLineTitle,
+  formatDuration,
+  formatRelativeTime,
+  previewText,
+} from '@/lib/formatRelativeTime';
+import { contextFromMetadata } from '@/lib/pendingDictationContext';
+import { PageFrame } from '@/components/ui-system/PageFrame';
+import { PageHeader } from '@/components/ui-system/PageHeader';
+import { Surface } from '@/components/ui-system/Surface';
+import { EmptyState } from '@/components/ui-system/EmptyState';
+import { Button } from '@/components/ui-system/Button';
+import { ContextChip } from '@/components/dashboard/ContextChip';
+import {
+  color,
+  font,
+  motion,
+  radius,
+  shadow,
+  space,
+} from '@/styles/tokens.stylex';
+import { sx } from '@/components/ui-system/sx';
+import { useT, mapBackendError } from '@/i18n';
+
+const historialRoute = getRouteApi('/historial');
+
+const COMPACT = '@media (max-width: 960px)';
+const STACK = '@media (max-width: 1100px)';
+
+const styles = stylex.create({
+  stats: {
+    display: 'flex',
+    gap: space.sm,
+    flexWrap: 'nowrap',
+  },
+  stat: {
+    minWidth: {
+      default: 88,
+      [COMPACT]: 56,
+    },
+  },
+  statValue: {
+    margin: 0,
+    fontFamily: font.display,
+    fontSize: {
+      default: '1.4rem',
+      [COMPACT]: '1.2rem',
+    },
+    fontWeight: 500,
+  },
+  statLabel: {
+    margin: 0,
+    color: color.muted,
+    fontFamily: font.sans,
+    fontSize: 12,
+  },
+  search: {
+    position: 'relative',
+    flexShrink: 0,
+  },
+  searchIcon: {
+    position: 'absolute',
+    left: 14,
+    top: '50%',
+    transform: 'translateY(-50%)',
+    color: color.muted,
+  },
+  input: {
+    width: '100%',
+    borderRadius: radius.pill,
+    borderWidth: 0,
+    paddingLeft: 42,
+    paddingRight: 16,
+    paddingTop: 10,
+    paddingBottom: 10,
+    backgroundColor: color.raised,
+    color: color.ink,
+    fontFamily: font.sans,
+    fontSize: 14,
+    boxShadow: 'inset 0 1px 2px rgba(28, 26, 25, 0.03)',
+    outlineColor: {
+      default: 'transparent',
+      ':focus': color.focus,
+    },
+    outlineStyle: {
+      default: 'none',
+      ':focus': 'solid',
+    },
+    outlineWidth: {
+      default: 0,
+      ':focus': 2,
+    },
+  },
+  layout: {
+    display: 'flex',
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    gap: 16,
+    flex: '1',
+    minWidth: 0,
+    minHeight: 0,
+    overflow: 'hidden',
+  },
+  list: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 8,
+    flex: '1',
+    minWidth: 0,
+    minHeight: 0,
+    overflowX: 'hidden',
+    overflowY: 'auto',
+  },
+  listHiddenOnStack: {
+    display: {
+      default: 'flex',
+      [STACK]: 'none',
+    },
+  },
+  detail: {
+    flex: {
+      default: '0 0 340px',
+      [STACK]: '1',
+    },
+    width: {
+      default: 340,
+      [STACK]: '100%',
+    },
+    maxWidth: '100%',
+    minWidth: 0,
+    minHeight: 0,
+    overflowX: 'hidden',
+    overflowY: 'auto',
+    backgroundColor: '#FFFFFF',
+  },
+  detailHead: {
+    display: 'flex',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: space.sm,
+    marginBottom: space.sm,
+  },
+  close: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 28,
+    height: 28,
+    padding: 0,
+    borderWidth: 0,
+    borderRadius: radius.pill,
+    backgroundColor: {
+      default: 'transparent',
+      ':hover': color.raised,
+    },
+    color: color.muted,
+    cursor: 'pointer',
+    flexShrink: 0,
+  },
+  item: {
+    display: 'grid',
+    gridTemplateColumns: '32px minmax(0, 1fr) auto',
+    alignItems: 'center',
+    columnGap: 12,
+    width: '100%',
+    minWidth: 0,
+    overflow: 'hidden',
+    textAlign: 'left',
+    cursor: 'pointer',
+    paddingBlock: {
+      default: 16,
+      [COMPACT]: 12,
+    },
+    paddingInline: {
+      default: 20,
+      [COMPACT]: 14,
+    },
+    borderWidth: 1,
+    borderStyle: 'solid',
+    borderColor: color.line,
+    borderRadius: 20,
+    backgroundColor: {
+      default: color.surface,
+      ':hover': '#FFFFFF',
+    },
+    color: 'inherit',
+    boxShadow: {
+      default: shadow.card,
+      ':hover':
+        '0 8px 24px -6px rgba(45, 42, 41, 0.08), 0 1px 3px 0 rgba(45, 42, 41, 0.04)',
+    },
+    transform: {
+      default: 'none',
+      ':hover': 'translateY(-1px)',
+    },
+    transitionProperty: 'background-color, box-shadow, transform',
+    transitionDuration: motion.fast,
+    outlineColor: {
+      default: 'transparent',
+      ':focus-visible': color.focus,
+    },
+    outlineOffset: {
+      default: 0,
+      ':focus-visible': 2,
+    },
+    outlineStyle: {
+      default: 'none',
+      ':focus-visible': 'solid',
+    },
+    outlineWidth: {
+      default: 0,
+      ':focus-visible': 2,
+    },
+  },
+  active: {
+    backgroundColor: '#FFFFFF',
+    boxShadow: shadow.card,
+    borderColor: 'rgba(138, 127, 214, 0.35)',
+  },
+  avatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    flexShrink: 0,
+    backgroundColor: '#232128',
+    boxShadow: '0 8px 18px -8px rgba(138, 127, 214, 0.45)',
+    position: 'relative',
+  },
+  eye: {
+    position: 'absolute',
+    top: 11,
+    width: 4,
+    height: 5,
+    borderRadius: radius.pill,
+    backgroundColor: '#f7f4ef',
+  },
+  eyeLeft: { left: 8 },
+  eyeRight: { right: 8 },
+  body: {
+    flex: '1',
+    minWidth: 0,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 2,
+  },
+  itemTitle: {
+    margin: 0,
+    fontFamily: font.sans,
+    fontSize: 14,
+    fontWeight: 600,
+    lineHeight: '20px',
+    color: color.ink,
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+  },
+  snippet: {
+    margin: 0,
+    color: '#5A5551',
+    fontFamily: font.sans,
+    fontSize: 12,
+    lineHeight: '16px',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+  },
+  trailing: {
+    display: 'flex',
+    flexDirection: {
+      default: 'row',
+      [STACK]: 'column',
+    },
+    alignItems: {
+      default: 'center',
+      [STACK]: 'flex-end',
+    },
+    justifyContent: 'flex-end',
+    gap: 8,
+    minWidth: 0,
+    flexShrink: 0,
+  },
+  meta: {
+    color: color.muted,
+    fontFamily: font.sans,
+    fontSize: 12,
+    lineHeight: '16px',
+    whiteSpace: 'nowrap',
+    flexShrink: 0,
+  },
+  actions: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: space.sm,
+  },
+  kicker: {
+    margin: 0,
+    color: color.muted,
+    fontFamily: font.sans,
+    fontSize: 12,
+    fontWeight: 600,
+    letterSpacing: '0.02em',
+  },
+  detailText: {
+    margin: 0,
+    marginBottom: space.md,
+    color: color.ink,
+    fontFamily: font.sans,
+    fontSize: 14,
+    lineHeight: '22px',
+    whiteSpace: 'pre-wrap',
+    overflowWrap: 'anywhere',
+  },
+});
+
+function MiniCompanion() {
+  return (
+    <span {...sx(styles.avatar)} aria-hidden>
+      <span {...sx(styles.eye, styles.eyeLeft)} />
+      <span {...sx(styles.eye, styles.eyeRight)} />
+    </span>
+  );
+}
 
 export function TranscriptionsPage() {
+  const t = useT();
+  const { q } = historialRoute.useSearch();
+  const navigate = useNavigate({ from: '/historial' });
+  const { config } = useAppConfig();
+  const ptt = formatHotkey(config?.hotkeys.push_to_talk);
   const {
     history,
     removeTranscription,
     copyToClipboard,
     downloadAudioFile,
-    refreshHistory
+    refreshHistory,
   } = useTranscriptionHistory();
+  const query = q ?? '';
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  // Listen for new transcription events
   useEffect(() => {
-    console.log('🔧 Setting up transcription-saved listener for TranscriptionsPage...');
-    
-    const unlistenTranscriptionSaved = listen('transcription-saved', (event) => {
-      const payload = event.payload as { id: string; text: string };
-      console.log('📝 Transcription saved event received:', payload);
+    const unlisten = listen('transcription-saved', () => {
       refreshHistory();
     });
-
-    console.log('✅ Transcription-saved listener set up successfully');
-
     return () => {
-      console.log('🧹 Cleaning up transcription-saved listener');
-      unlistenTranscriptionSaved.then(unlistenFn => unlistenFn());
+      unlisten.then(fn => fn());
     };
   }, [refreshHistory]);
 
-  const formatDuration = (ms: number) => {
-    const seconds = Math.floor(ms / 1000);
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = seconds % 60;
-    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
-  };
+  const filtered = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    if (!needle) return history;
+    return history.filter(item => item.text.toLowerCase().includes(needle));
+  }, [history, query]);
 
-  const formatFileSize = (bytes: number) => {
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
-  };
+  const selected = filtered.find(item => item.id === selectedId) ?? null;
 
-  const getTimeAgo = (timestamp: string) => {
-    const now = new Date();
-    const date = new Date(timestamp);
-    const diffMs = now.getTime() - date.getTime();
-    const diffMinutes = Math.floor(diffMs / (1000 * 60));
-    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-
-    if (diffMinutes < 60) {
-      return `${diffMinutes} min ago`;
-    } else if (diffHours < 24) {
-      return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
-    } else {
-      const diffDays = Math.floor(diffHours / 24);
-      return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
-    }
-  };
-
-  const getPreviewText = (text: string) => {
-    return text.length > 80 ? text.substring(0, 80) + '...' : text;
-  };
-
-  const getTitleFromText = (text: string) => {
-    // Extract first sentence or first 40 characters as title
-    const firstSentence = text.split('.')[0];
-    if (firstSentence.length <= 40) {
-      return firstSentence;
-    }
-    return text.substring(0, 40) + '...';
-  };
-
-  const handleCopyToClipboard = async (text: string) => {
-    const success = await copyToClipboard(text);
-    if (success) {
-      console.log('Text copied to clipboard');
-    }
-  };
-
-  const handleDownloadAudio = async (item: TranscriptionRecord) => {
-    try {
-      // Create a filename based on the transcription
-      const timestamp = new Date(item.created_at).toISOString().split('T')[0];
-      const filename = `murmullo_${timestamp}_${item.id.substring(0, 8)}.wav`;
-
-      // Use the browser's download API
-      const audioPath = await downloadAudioFile(item.id, filename);
-      if (audioPath) {
-        console.log('Audio file downloaded:', filename);
-      }
-    } catch (error) {
-      console.error('Failed to download audio file:', error);
-    }
-  };
+  const words = history.reduce(
+    (sum, item) => sum + item.text.split(/\s+/).filter(Boolean).length,
+    0
+  );
+  const minutes = Math.round(
+    history.reduce((sum, item) => sum + item.duration_ms, 0) / 60000
+  );
 
   return (
-    <div className="min-h-full bg-background">
-      <Container size="lg" padding="sm">
-        <Section spacing="md">
-          {/* Header */}
-          <Flex direction="column" align="center" gap="sm" className="mb-6">
-            <Heading level={1} size="2xl" color="default" className="font-semibold">
-              Recent Transcriptions
-            </Heading>
-            <Text size="sm" color="muted" align="center" className="font-light">
-              Your latest voice recordings and transcriptions
-            </Text>
-          </Flex>
-
-          {/* Transcriptions List */}
-          {history.length === 0 ? (
-            <div className="text-center py-8">
-              <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mx-auto mb-3">
-                <svg className="w-6 h-6 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
-                </svg>
-              </div>
-              <Text size="sm" color="muted" className="font-light">
-                No transcriptions yet
-              </Text>
-              <Text size="xs" color="muted" align="center" className="font-light">
-                Start recording to see your transcriptions here
-              </Text>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {history.map((item) => (
-                <div key={item.id} className="bg-card border border-border rounded-lg p-3 hover:bg-accent/50 transition-colors group">
-                  <div className="flex justify-between items-start mb-2">
-                    <Heading level={4} size="sm" className="font-medium text-foreground group-hover:text-primary transition-colors">
-                      {getTitleFromText(item.text)}
-                    </Heading>
-                    <Badge variant="secondary" className="text-xs px-2 py-1 rounded-full bg-primary/10 text-primary font-light">
-                      {getTimeAgo(item.created_at)}
-                    </Badge>
-                  </div>
-
-                  <Text size="sm" color="muted" className="leading-relaxed mb-2 font-light">
-                    {getPreviewText(item.text)}
-                  </Text>
-
-                  <div className="flex justify-between items-center">
-                    <div className="flex gap-4 text-xs text-muted-foreground font-light">
-                      <span className="flex items-center gap-1">
-                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        {formatDuration(item.duration_ms)}
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 4V2a1 1 0 011-1h8a1 1 0 011 1v2m0 0V1a1 1 0 011-1h2a1 1 0 011 1v18a1 1 0 01-1 1H4a1 1 0 01-1-1V1a1 1 0 011-1h2a1 1 0 011 1v3m0 0h8" />
-                        </svg>
-                        {formatFileSize(item.file_size_bytes)}
-                      </span>
-                      <Badge variant="outline" className="text-xs px-2 py-0.5 rounded-full border-muted-foreground/20 font-light">
-                        {item.model_used}
-                      </Badge>
-                      {item.language && (
-                        <Badge variant="outline" className="text-xs px-2 py-0.5 rounded-full border-muted-foreground/20 font-light">
-                          {item.language}
-                        </Badge>
-                      )}
-                    </div>
-
-                    <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button
-                        onClick={() => handleCopyToClipboard(item.text)}
-                        className="text-xs text-primary hover:text-primary/80 transition-colors px-2 py-1 rounded hover:bg-primary/10 font-light flex items-center gap-1"
-                      >
-                        <Copy size={12} />
-                        Copy
-                      </button>
-                      <button
-                        onClick={() => handleDownloadAudio(item)}
-                        className="text-xs text-blue-600 hover:text-blue-800 transition-colors px-2 py-1 rounded hover:bg-blue-100 font-light flex items-center gap-1"
-                      >
-                        <Download size={12} />
-                        Download
-                      </button>
-                      <button
-                        onClick={() => removeTranscription(item.id)}
-                        className="text-xs text-destructive hover:text-destructive/80 transition-colors px-2 py-1 rounded hover:bg-destructive/10 font-light flex items-center gap-1"
-                      >
-                        <Trash2 size={12} />
-                        Delete
-                      </button>
-                    </div>
-                  </div>
+    <PageFrame fill>
+      <PageHeader
+        title={t('history.title')}
+        lede={t('history.lede')}
+        actions={
+          <div {...sx(styles.stats)}>
+            {[
+              { label: t('history.words'), value: words.toLocaleString() },
+              { label: t('history.minutes'), value: String(minutes) },
+              { label: t('history.clips'), value: String(history.length) },
+            ].map(stat => (
+              <Surface key={stat.label} padded="sm">
+                <div {...sx(styles.stat)}>
+                  <p {...sx(styles.statValue)}>{stat.value}</p>
+                  <p {...sx(styles.statLabel)}>{stat.label}</p>
                 </div>
-              ))}
-            </div>
-          )}
-        </Section>
-      </Container>
-    </div>
+              </Surface>
+            ))}
+          </div>
+        }
+      />
+
+      <div {...sx(styles.search)}>
+        <Search size={16} {...sx(styles.searchIcon)} />
+        <input
+          value={query}
+          onChange={e =>
+            void navigate({
+              search: prev => ({
+                ...prev,
+                q: e.target.value ? e.target.value : undefined,
+              }),
+            })
+          }
+          placeholder={t('history.searchPlaceholder')}
+          aria-label={t('history.searchAria')}
+          {...sx(styles.input)}
+        />
+      </div>
+
+      {filtered.length === 0 ? (
+        <EmptyState
+          title={
+            history.length === 0
+              ? t('history.emptyTitle')
+              : t('history.noMatchTitle')
+          }
+          body={
+            history.length === 0
+              ? t('history.emptyBody', { ptt })
+              : t('history.noMatchBody')
+          }
+        />
+      ) : (
+        <div {...sx(styles.layout)}>
+          <div
+            {...sx(styles.list, selected ? styles.listHiddenOnStack : false)}
+          >
+            {filtered.map(item => {
+              const active = selected?.id === item.id;
+              const context = contextFromMetadata(item.metadata);
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() =>
+                    setSelectedId(current =>
+                      current === item.id ? null : item.id
+                    )
+                  }
+                  aria-pressed={active}
+                  {...sx(styles.item, active ? styles.active : false)}
+                >
+                  <MiniCompanion />
+                  <span {...sx(styles.body)}>
+                    <span {...sx(styles.itemTitle)}>
+                      {firstLineTitle(item.text)}
+                    </span>
+                    <span {...sx(styles.snippet)}>
+                      {previewText(item.text)}
+                    </span>
+                  </span>
+                  <span {...sx(styles.trailing)}>
+                    <span {...sx(styles.meta)}>
+                      {formatRelativeTime(item.created_at)}
+                    </span>
+                    {context ? <ContextChip context={context} /> : null}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          {selected ? (
+            <Surface
+              as="aside"
+              xstyle={styles.detail}
+              aria-label={t('history.detail')}
+            >
+              <div {...sx(styles.detailHead)}>
+                <p {...sx(styles.kicker)}>{t('history.detail')}</p>
+                <button
+                  type="button"
+                  aria-label={t('history.closeDetail')}
+                  onClick={() => setSelectedId(null)}
+                  {...sx(styles.close)}
+                >
+                  <X size={16} strokeWidth={1.8} aria-hidden />
+                </button>
+              </div>
+              <p {...sx(styles.detailText)}>{selected.text}</p>
+              <p {...sx(styles.meta)}>
+                {formatDuration(selected.duration_ms)} · {selected.model_used}
+              </p>
+              <div {...sx(styles.actions)}>
+                <Button
+                  size="sm"
+                  tone="ghost"
+                  onClick={() => copyToClipboard(selected.text)}
+                >
+                  <Copy size={13} strokeWidth={1.5} /> {t('history.copy')}
+                </Button>
+                <Button
+                  size="sm"
+                  tone="ghost"
+                  onClick={async () => {
+                    try {
+                      await insertionService.insertText(selected.text);
+                      toast.success(t('history.pasted'));
+                    } catch (e) {
+                      toast.error(mapBackendError(e));
+                    }
+                  }}
+                >
+                  <ClipboardPaste size={13} strokeWidth={1.5} />{' '}
+                  {t('history.paste')}
+                </Button>
+                <Button
+                  size="sm"
+                  tone="ghost"
+                  onClick={async () => {
+                    const replacement = window.prompt(
+                      t('history.correctedPrompt'),
+                      selected.text
+                    );
+                    if (!replacement) return;
+                    await dictionaryService.applyCorrection(
+                      selected.raw_text || selected.text,
+                      replacement
+                    );
+                    toast.success(t('dictionary.updated'));
+                  }}
+                >
+                  <SpellCheck size={13} strokeWidth={1.5} />{' '}
+                  {t('history.correct')}
+                </Button>
+                <Button
+                  size="sm"
+                  tone="quiet"
+                  onClick={async () => {
+                    const timestamp = new Date(selected.created_at)
+                      .toISOString()
+                      .split('T')[0];
+                    await downloadAudioFile(
+                      selected.id,
+                      `murmullo_${timestamp}_${selected.id.substring(0, 8)}.wav`
+                    );
+                  }}
+                >
+                  <Download size={13} strokeWidth={1.5} /> {t('history.audio')}
+                </Button>
+                <Button
+                  size="sm"
+                  tone="danger"
+                  onClick={() => removeTranscription(selected.id)}
+                >
+                  <Trash2 size={13} strokeWidth={1.5} /> {t('history.delete')}
+                </Button>
+              </div>
+            </Surface>
+          ) : null}
+        </div>
+      )}
+    </PageFrame>
   );
 }

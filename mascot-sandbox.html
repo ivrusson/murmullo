@@ -1,0 +1,431 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Murmullo · Sandbox de la mascota</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600&family=Newsreader:ital,wght@1,400&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --ink: #1c1a19;
+        --ink-2: #5a5551;
+        --ink-3: #8c847e;
+        --paper: #f5f2eb;
+        --paper-2: #ede8df;
+        --surface: rgba(255, 255, 255, 0.72);
+        --line: rgba(28, 26, 25, 0.08);
+        --iris: #8a7fd6;
+        --blush: #e0837e;
+        --radius: 20px;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        font-family:
+          'Plus Jakarta Sans',
+          -apple-system,
+          BlinkMacSystemFont,
+          sans-serif;
+        color: var(--ink);
+        background:
+          radial-gradient(
+            120% 80% at 20% 10%,
+            rgba(138, 127, 214, 0.14),
+            transparent 60%
+          ),
+          radial-gradient(
+            90% 70% at 85% 90%,
+            rgba(224, 131, 126, 0.12),
+            transparent 60%
+          ),
+          linear-gradient(180deg, var(--paper) 0%, var(--paper-2) 100%);
+        overflow: hidden;
+      }
+      body.dark {
+        --ink: #f3f0e9;
+        --ink-2: #c8c2ba;
+        --ink-3: #8c847e;
+        --paper: #17161a;
+        --paper-2: #0f0f12;
+        --surface: rgba(30, 28, 34, 0.7);
+        --line: rgba(255, 255, 255, 0.08);
+      }
+
+      .app {
+        display: grid;
+        grid-template-columns: 1fr 320px;
+        grid-template-rows: auto 1fr auto;
+        height: 100%;
+        gap: 16px;
+        padding: 20px 24px;
+      }
+      .app.no-panel {
+        grid-template-columns: 1fr;
+      }
+      .app.no-panel .panel {
+        display: none;
+      }
+
+      header {
+        grid-column: 1 / -1;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+      }
+      .brand {
+        display: flex;
+        align-items: baseline;
+        gap: 12px;
+      }
+      .brand h1 {
+        margin: 0;
+        font-size: 22px;
+        font-weight: 600;
+        letter-spacing: -0.02em;
+      }
+      .brand em {
+        font-family: 'Newsreader', Georgia, serif;
+        font-style: italic;
+        color: var(--ink-2);
+        font-size: 16px;
+      }
+
+      .seg {
+        display: inline-flex;
+        background: rgba(28, 26, 25, 0.06);
+        border-radius: 999px;
+        padding: 3px;
+        gap: 2px;
+      }
+      body.dark .seg {
+        background: rgba(255, 255, 255, 0.08);
+      }
+      .seg button {
+        border: 0;
+        background: transparent;
+        color: var(--ink-2);
+        font: inherit;
+        font-size: 12.5px;
+        font-weight: 500;
+        padding: 6px 12px;
+        border-radius: 999px;
+        cursor: pointer;
+        transition:
+          background 160ms ease,
+          color 160ms ease;
+      }
+      .seg button[aria-pressed='true'] {
+        background: var(--ink);
+        color: var(--paper);
+      }
+
+      .stage-wrap {
+        grid-column: 1;
+        grid-row: 2;
+        position: relative;
+        display: grid;
+        place-items: center;
+        min-height: 0;
+      }
+      .stage-wrap.both {
+        grid-template-columns: 1fr 1fr;
+      }
+      .stage {
+        position: relative;
+        width: min(100%, calc(76vh * 1.4));
+        aspect-ratio: 1.4;
+        max-height: 100%;
+      }
+      .stage-wrap.both .stage {
+        width: min(100%, calc(70vh * 1.2));
+        aspect-ratio: 1.2;
+      }
+      .stage canvas,
+      .stage svg {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+      }
+      .stage .tag {
+        position: absolute;
+        top: 8px;
+        left: 12px;
+        font-size: 11px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--ink-3);
+      }
+      .caption {
+        position: absolute;
+        left: 50%;
+        bottom: 6px;
+        transform: translateX(-50%);
+        text-align: center;
+        pointer-events: none;
+      }
+      .caption strong {
+        display: block;
+        font-size: 14px;
+        font-weight: 600;
+      }
+      .caption span {
+        font-family: 'Newsreader', Georgia, serif;
+        font-style: italic;
+        color: var(--ink-2);
+        font-size: 14px;
+      }
+
+      .panel {
+        grid-column: 2;
+        grid-row: 2 / 4;
+        background: var(--surface);
+        backdrop-filter: blur(24px) saturate(140%);
+        -webkit-backdrop-filter: blur(24px) saturate(140%);
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        padding: 16px;
+        overflow: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+        font-size: 12.5px;
+      }
+      .panel h2 {
+        margin: 0;
+        font-size: 11px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--ink-3);
+        font-weight: 600;
+      }
+      .row {
+        display: grid;
+        grid-template-columns: 96px 1fr 40px;
+        align-items: center;
+        gap: 8px;
+      }
+      .row label {
+        color: var(--ink-2);
+      }
+      .row output {
+        text-align: right;
+        font-variant-numeric: tabular-nums;
+        color: var(--ink-3);
+        font-size: 11.5px;
+      }
+      input[type='range'] {
+        width: 100%;
+        accent-color: var(--iris);
+      }
+      select,
+      .btn {
+        font: inherit;
+        font-size: 12.5px;
+        border: 1px solid var(--line);
+        background: transparent;
+        color: var(--ink);
+        border-radius: 999px;
+        padding: 6px 12px;
+        cursor: pointer;
+      }
+      .btn.primary {
+        background: var(--ink);
+        color: var(--paper);
+        border-color: var(--ink);
+      }
+      .swatches {
+        display: flex;
+        gap: 10px;
+      }
+      .swatch {
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        border: 2px solid transparent;
+        cursor: pointer;
+        padding: 0;
+        transition: transform 160ms ease;
+      }
+      .swatch[aria-pressed='true'] {
+        border-color: var(--ink);
+        transform: scale(1.1);
+      }
+      .meter {
+        height: 6px;
+        border-radius: 999px;
+        background: rgba(28, 26, 25, 0.08);
+        overflow: hidden;
+      }
+      .meter i {
+        display: block;
+        height: 100%;
+        width: 0%;
+        background: linear-gradient(90deg, var(--iris), var(--blush));
+        transition: width 60ms linear;
+      }
+      .check {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        color: var(--ink-2);
+      }
+
+      footer {
+        grid-column: 1;
+        grid-row: 3;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        justify-content: center;
+      }
+      .state {
+        font: inherit;
+        font-size: 12.5px;
+        border: 1px solid var(--line);
+        background: var(--surface);
+        color: var(--ink-2);
+        border-radius: 999px;
+        padding: 7px 12px;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        transition:
+          background 160ms ease,
+          color 160ms ease;
+      }
+      .state kbd {
+        font: inherit;
+        font-size: 10.5px;
+        color: var(--ink-3);
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        padding: 0 5px;
+      }
+      .state[aria-pressed='true'] {
+        background: var(--ink);
+        color: var(--paper);
+        border-color: var(--ink);
+      }
+      .state[aria-pressed='true'] kbd {
+        color: var(--paper);
+        opacity: 0.6;
+      }
+      .hint {
+        color: var(--ink-3);
+        font-size: 11.5px;
+        line-height: 1.5;
+        margin: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app" id="app">
+      <header>
+        <div class="brand">
+          <h1>Murmullo</h1>
+          <em>Una pequeña presencia que te escucha.</em>
+        </div>
+        <div style="display: flex; gap: 10px; align-items: center">
+          <div class="seg" id="renderer-seg" role="group" aria-label="Renderer">
+            <button data-renderer="3d" aria-pressed="true">
+              3D · three.js
+            </button>
+            <button data-renderer="2d" aria-pressed="false">2D · SVG</button>
+            <button data-renderer="both" aria-pressed="false">Ambos</button>
+          </div>
+          <button class="btn" id="toggle-theme" title="Fondo claro / oscuro">
+            ◐
+          </button>
+          <button class="btn" id="toggle-panel" title="Mostrar / ocultar panel">
+            Panel
+          </button>
+        </div>
+      </header>
+
+      <main class="stage-wrap" id="stage-wrap"></main>
+
+      <aside class="panel" id="panel">
+        <section>
+          <h2>Audio</h2>
+          <div
+            class="seg"
+            id="audio-seg"
+            role="group"
+            aria-label="Fuente de audio"
+            style="margin-top: 8px"
+          >
+            <button data-audio="none" aria-pressed="true">Silencio</button>
+            <button data-audio="synthetic" aria-pressed="false">
+              Simulado
+            </button>
+            <button data-audio="mic" aria-pressed="false">Micrófono</button>
+          </div>
+          <div class="meter" style="margin-top: 10px"><i id="meter"></i></div>
+          <p class="hint" id="audio-hint">
+            Con «Escuchando» o «Hablando» el nivel deforma el cuerpo y el
+            brillo.
+          </p>
+        </section>
+
+        <section>
+          <h2>Variación</h2>
+          <div class="swatches" id="swatches" style="margin-top: 8px"></div>
+        </section>
+
+        <section>
+          <h2>Personalidad</h2>
+          <div
+            class="seg"
+            id="personality-seg"
+            role="group"
+            style="margin-top: 8px"
+          >
+            <button data-personality="curioso" aria-pressed="true">
+              Curioso
+            </button>
+            <button data-personality="amigable" aria-pressed="false">
+              Amigable
+            </button>
+            <button data-personality="expresivo" aria-pressed="false">
+              Expresivo
+            </button>
+          </div>
+        </section>
+
+        <section
+          id="sliders"
+          style="display: flex; flex-direction: column; gap: 8px"
+        >
+          <h2>Forma</h2>
+        </section>
+
+        <section style="display: flex; flex-direction: column; gap: 8px">
+          <h2>Movimiento</h2>
+          <label class="check"
+            ><input type="checkbox" id="reduced" /> Movimiento reducido</label
+          >
+          <label class="check"
+            ><input type="checkbox" id="autocycle" /> Ciclo automático de
+            estados</label
+          >
+          <button class="btn" id="reseed">Nueva semilla</button>
+        </section>
+      </aside>
+
+      <footer id="states"></footer>
+    </div>
+    <script type="module" src="/src/mascot/sandbox/main.ts"></script>
+  </body>
+</html>

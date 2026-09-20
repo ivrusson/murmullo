@@ -1,0 +1,53 @@
+name: Crash Report
+description: Report a crash or fatal error captured by Murmullo
+title: '[Crash]: '
+labels: [crash, bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This template is meant for crashes captured by the app. Do not attach
+        recordings, transcripts, or dictionary contents unless you paste them.
+  - type: textarea
+    id: description
+    attributes:
+      label: What you were doing
+      description: Optional comment. The app fills a default if you send from the crash window.
+      placeholder: I released the hotkey while Slack was focused.
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Version, OS, locale, STT/LLM snapshot. Filled by the app.
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: stack
+    attributes:
+      label: Stack / panic
+      description: Message and stack from the crash reporter. No audio or transcripts.
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Optional, if you can trigger it again.
+    validations:
+      required: false
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: false
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: false

@@ -1,0 +1,59 @@
+name: Bug Report
+description: Report a problem in Murmullo
+title: '[Bug]: '
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting an issue. The in-app form pre-fills environment data.
+        Do not attach audio, dictation text, or dictionary entries unless you paste them yourself.
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug description
+      description: What went wrong?
+      placeholder: Murmullo did not paste after I released the hotkey.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Numbered steps if you can reproduce it.
+      placeholder: |
+        1. Hold the dictation shortcut
+        2. Speak
+        3. Release
+    validations:
+      required: false
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      placeholder: The transcribed text is pasted into the focused app.
+    validations:
+      required: false
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      placeholder: What happened instead, including any error copy.
+    validations:
+      required: false
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Filled by the app when you report from Murmullo.
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: stack
+    attributes:
+      label: Logs / stack
+      description: Optional stack trace or pipeline log excerpt. No audio or transcripts.
+      render: shell
+    validations:
+      required: false

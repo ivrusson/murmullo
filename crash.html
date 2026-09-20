@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Murmullo</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=Plus+Jakarta+Sans:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <script>
+      (function () {
+        try {
+          var stored = localStorage.getItem('murmullo-theme');
+          var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+          var isDark = stored === 'dark' || (stored === 'system' && prefersDark);
+          document.documentElement.classList.toggle('dark', isDark);
+          document.documentElement.style.colorScheme = isDark ? 'dark' : 'light';
+        } catch (e) {
+          document.documentElement.classList.remove('dark');
+          document.documentElement.style.colorScheme = 'light';
+        }
+      })();
+    </script>
+    <link rel="stylesheet" href="/src/styles/globals.css" />
+    <style>
+      :root {
+        --crash-bg: #f5f2eb;
+        --crash-surface: #faf8f5;
+        --crash-ink: #1c1a19;
+        --crash-muted: #8c847e;
+        --crash-line: rgba(28, 26, 25, 0.08);
+        --crash-danger: #ba1a1a;
+      }
+      html.dark {
+        --crash-bg: #1c1a19;
+        --crash-surface: #262321;
+        --crash-ink: #f5f2eb;
+        --crash-muted: #a39b94;
+        --crash-line: rgba(245, 242, 235, 0.1);
+        --crash-danger: #ffb4ab;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        min-height: 100%;
+        background: var(--color-bg, var(--crash-bg));
+        color: var(--color-ink, var(--crash-ink));
+        font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      }
+      body {
+        padding: 28px;
+      }
+      main {
+        max-width: 440px;
+        margin: 0 auto;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+      }
+      h1 {
+        margin: 0;
+        font-family: Fraunces, Georgia, serif;
+        font-size: 1.75rem;
+        letter-spacing: -0.02em;
+      }
+      .lede,
+      .hint,
+      .status {
+        margin: 0;
+        color: var(--color-muted, var(--crash-muted));
+        font-size: 13px;
+        line-height: 1.5;
+      }
+      .status[data-tone='error'] {
+        color: var(--color-danger, var(--crash-danger));
+      }
+      .message {
+        margin: 0;
+        font-size: 14px;
+        line-height: 1.45;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+      pre {
+        margin: 0;
+        max-height: 160px;
+        overflow: auto;
+        padding: 12px;
+        border-radius: 12px;
+        background: var(--color-surface, var(--crash-surface));
+        border: 1px solid var(--color-line, var(--crash-line));
+        font-size: 11px;
+        line-height: 1.4;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+      label {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        font-size: 12px;
+        font-weight: 600;
+      }
+      textarea {
+        width: 100%;
+        min-height: 88px;
+        resize: vertical;
+        border-radius: 12px;
+        border: 1px solid var(--color-line, var(--crash-line));
+        background: var(--color-surface, var(--crash-surface));
+        color: inherit;
+        font: inherit;
+        font-size: 13px;
+        padding: 10px 12px;
+      }
+      textarea:focus {
+        outline: 2px solid #8a7fd6;
+        outline-offset: 1px;
+      }
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 4px;
+      }
+      button {
+        height: 36px;
+        padding: 0 16px;
+        border-radius: 999px;
+        border: 1px solid transparent;
+        font: inherit;
+        font-size: 13px;
+        font-weight: 500;
+        cursor: pointer;
+      }
+      button:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+      }
+      .primary {
+        background: var(--color-ink, var(--crash-ink));
+        color: var(--color-surface, var(--crash-surface));
+      }
+      .quiet {
+        background: transparent;
+        border-color: var(--color-line, var(--crash-line));
+        color: inherit;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1 id="title">Murmullo se detuvo</h1>
+      <p class="lede" id="lede"></p>
+      <p class="message" id="message"></p>
+      <pre id="stack" hidden></pre>
+      <label>
+        <span id="comment-label">Comentario (opcional)</span>
+        <textarea id="comment" rows="4"></textarea>
+      </label>
+      <div class="actions">
+        <button class="primary" id="send" type="button">Enviar a GitHub</button>
+        <button class="quiet" id="copy" type="button">Copiar</button>
+        <button class="quiet" id="dismiss" type="button">Descartar</button>
+      </div>
+      <p class="hint" id="hint"></p>
+      <p class="status" id="status"></p>
+    </main>
+    <script type="module" src="/src/crash-reporter.ts"></script>
+  </body>
+</html>

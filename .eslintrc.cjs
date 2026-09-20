@@ -1,22 +1,35 @@
-{
-  "root": true,
-  "env": { "browser": true, "es2020": true },
-  "extends": [
+module.exports = {
+  root: true,
+  env: { browser: true, es2020: true },
+  extends: [
     "eslint:recommended",
-    "@typescript-eslint/recommended",
-    "plugin:react-hooks/recommended"
+    "plugin:@typescript-eslint/recommended",
+    "plugin:react-hooks/recommended",
   ],
-  "ignorePatterns": ["dist", ".eslintrc.cjs"],
-  "parser": "@typescript-eslint/parser",
-  "plugins": ["react-refresh"],
-  "rules": {
+  ignorePatterns: ["dist", ".eslintrc.cjs", "src/routeTree.gen.ts"],
+  parser: "@typescript-eslint/parser",
+  plugins: ["react-refresh", "@stylexjs"],
+  rules: {
+    "@stylexjs/valid-styles": "error",
+    "@stylexjs/no-unused": "error",
     "react-refresh/only-export-components": [
       "warn",
-      { "allowConstantExport": true }
+      {
+        allowConstantExport: true,
+        allowExportNames: [
+          "useLocale",
+          "useT",
+          "useAppTheme",
+          "useAppConfig",
+        ],
+      },
     ],
-    "@typescript-eslint/no-unused-vars": ["error", { "argsIgnorePattern": "^_" }],
+    "@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_" }],
     "@typescript-eslint/no-explicit-any": "warn",
     "prefer-const": "error",
-    "no-var": "error"
-  }
-}
+    "no-var": "error",
+    "react-hooks/refs": "off",
+    "react-hooks/set-state-in-effect": "off",
+    "react-hooks/purity": "off",
+  },
+};

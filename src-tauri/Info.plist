@@ -3,8 +3,8 @@
 <plist version="1.0">
 <dict>
     <key>NSMicrophoneUsageDescription</key>
-    <string>The app requires access to your microphone for the voice recording feature.</string>
-    <key>NSCameraUsageDescription</key>
-    <string>The app requires access to your camera for capturing photos and videos.</string>
+    <string>Murmullo graba el micrófono a nivel de sistema mientras mantienes el atajo de dictado, aunque otra app tenga el foco.</string>
+    <key>NSAppleEventsUsageDescription</key>
+    <string>Murmullo pega el texto dictado en la app que tienes delante.</string>
 </dict>
 </plist>

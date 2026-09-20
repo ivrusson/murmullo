@@ -1,6 +1,6 @@
 # Rust/Tauri
 /target/
-Cargo.lock
+/Cargo.lock
 **/*.rs.bk
 *.pdb
 
@@ -10,7 +10,6 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
-lerna-debug.log*
 
 # Build outputs
 dist/
@@ -26,6 +25,9 @@ out/
 .env.development.local
 .env.test.local
 .env.production.local
+
+# Local MCP secrets
+.cursor/mcp.json
 
 # IDE and editor files
 .vscode/
@@ -53,53 +55,22 @@ pids/
 *.seed
 *.pid.lock
 
-# Coverage directory used by tools like istanbul
+# Coverage
 coverage/
 *.lcov
-
-# nyc test coverage
 .nyc_output/
+test-results/
 
-# Dependency directories
-jspm_packages/
-
-# Optional npm cache directory
+# Optional caches
 .npm
-
-# Optional eslint cache
 .eslintcache
-
-# Microbundle cache
-.rpt2_cache/
-.rts2_cache_cjs/
-.rts2_cache_es/
-.rts2_cache_umd/
-
-# Optional REPL history
-.node_repl_history
+.stylelintcache
+.cache
+.parcel-cache
+*.tsbuildinfo
 
 # Output of 'npm pack'
 *.tgz
-
-# Yarn Integrity file
-.yarn-integrity
-
-# parcel-bundler cache (https://parceljs.org/)
-.cache
-.parcel-cache
-
-# Next.js build output
-.next
-
-# Nuxt.js build / generate output
-.nuxt
-
-# Gatsby files
-.cache/
-
-# Storybook build outputs
-.out
-.storybook-out
 
 # Temporary folders
 tmp/
@@ -120,7 +91,6 @@ models/*.gguf
 
 # Tauri specific
 src-tauri/target/
-src-tauri/Cargo.lock
 src-tauri/gen/
 
 # Generated files
@@ -131,13 +101,6 @@ src-tauri/gen/
 *.backup
 *.old
 
-# Test files
-test-results/
-coverage/
-
-# Documentation build
-docs/_build/
-
 # Local configuration
 config.local.*
 settings.local.*
@@ -146,20 +109,3 @@ settings.local.*
 *.db
 *.sqlite
 *.sqlite3
-
-# Cache directories
-.cache/
-.parcel-cache/
-.eslintcache
-.stylelintcache
-
-# TypeScript
-*.tsbuildinfo
-
-# Optional stylelint cache
-.stylelintcache
-
-# SvelteKit build / generate output
-.svelte-kit
-
-# End of https://www.gitignore.io/api/node,rust,tauri

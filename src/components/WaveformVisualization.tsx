@@ -1,56 +1,49 @@
-import React from 'react';
+import { useMemo } from 'react';
 
 interface WaveformVisualizationProps {
-  audioLevel: number; // 0-1 range
+  audioLevel: number;
+  bars?: number;
+  barWidth?: number;
 }
 
-export const WaveformVisualization: React.FC<WaveformVisualizationProps> = ({ audioLevel }) => {
-  const bars = 12;
-  const barWidth = 1.5;
-  const maxHeight = 12;
-  const spacing = 1;
+export function WaveformVisualization({
+  audioLevel,
+  bars = 22,
+  barWidth = 2.5,
+}: WaveformVisualizationProps) {
+  const maxHeight = 18;
+  const spacing = 2.2;
+  const visual = Math.min(1, Math.pow(Math.max(audioLevel, 0), 0.55));
 
-  // Generate bar heights based on audio level with some randomness for natural look
-  const generateBarHeights = () => {
-    const heights = [];
-    for (let i = 0; i < bars; i++) {
-      // Add some variation to make it look more natural
-      const variation = Math.random() * 0.3 + 0.7; // 0.7 to 1.0
-      const height = Math.max(2, audioLevel * maxHeight * variation);
-      heights.push(height);
-    }
-    return heights;
-  };
-
-  const barHeights = generateBarHeights();
+  const barHeights = useMemo(() => {
+    return Array.from({ length: bars }, (_, i) => {
+      const envelope =
+        0.35 + 0.65 * Math.sin((i / Math.max(bars - 1, 1)) * Math.PI);
+      const wobble = 0.75 + 0.25 * Math.sin(i * 1.7 + visual * 9);
+      return Math.max(2.5, visual * maxHeight * envelope * wobble);
+    });
+  }, [bars, visual]);
 
   return (
     <div className="waveform-container">
-      <svg 
-        width={bars * (barWidth + spacing) - spacing} 
+      <svg
+        width={bars * (barWidth + spacing) - spacing}
         height={maxHeight + 4}
         className="waveform-svg"
+        aria-hidden
       >
-        <defs>
-          <linearGradient id="waveform-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="rgba(200, 180, 255, 0.8)" />
-            <stop offset="100%" stopColor="rgba(180, 255, 200, 0.8)" />
-          </linearGradient>
-        </defs>
         {barHeights.map((height, index) => (
           <rect
             key={index}
+            className="waveform-bar"
             x={index * (barWidth + spacing)}
             y={maxHeight - height + 2}
             width={barWidth}
             height={height}
-            className="waveform-bar"
-            style={{
-              animationDelay: `${index * 0.05}s`,
-            }}
+            rx={barWidth / 2}
           />
         ))}
       </svg>
     </div>
   );
-};
+}

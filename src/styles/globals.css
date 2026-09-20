@@ -1,301 +1,311 @@
-@import "tailwindcss";
+/* StyleX injects @layer priority1–5. Declare them at the end. */
+@layer theme, base, components, utilities, priority1, priority2, priority3, priority4, priority5;
 
 @layer base {
   :root {
-    /* Light theme with high contrast - DeepSeek inspired */
-    --background: 220 14% 96%;
-    --foreground: 220 13% 15%;
-    --card: 220 14% 98%;
-    --card-foreground: 220 13% 15%;
-    --popover: 220 14% 98%;
-    --popover-foreground: 220 13% 15%;
-    --primary: 220 13% 15%;
-    --primary-foreground: 220 14% 96%;
-    --secondary: 220 14% 92%;
-    --secondary-foreground: 220 13% 15%;
-    --muted: 220 14% 88%;
-    --muted-foreground: 220 9% 45%;
-    --accent: 220 14% 92%;
-    --accent-foreground: 220 13% 15%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 220 9% 95%;
-    --success: 142 76% 36%;
-    --success-foreground: 220 9% 95%;
-    --warning: 38 92% 50%;
-    --warning-foreground: 220 9% 95%;
-    --border: 220 13% 85%;
-    --input: 220 13% 85%;
-    --ring: 220 13% 15%;
-    --radius: 0.75rem;
-    
-    /* Light surface variations with good contrast */
-    --surface-1: 220 14% 98%;
-    --surface-2: 220 14% 95%;
-    --surface-3: 220 14% 92%;
-    --surface-4: 220 14% 89%;
-    
-    /* Spacing scale */
-    --spacing-xs: 0.25rem;
-    --spacing-sm: 0.5rem;
-    --spacing-md: 1rem;
-    --spacing-lg: 1.5rem;
-    --spacing-xl: 2rem;
-    --spacing-2xl: 3rem;
-    
-    /* Typography */
-    --font-family: "Lato", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    /* Ceramic — light (Paper + DESIGN.md) */
+    --color-canvas: #ede8df;
+    --color-bg: #f5f2eb;
+    --color-surface: #faf8f5;
+    --color-raised: #f1eee7;
+    --color-ink: #1c1a19;
+    --color-muted: #8c847e;
+    --color-line: rgba(28, 26, 25, 0.07);
+    --color-iris: #8a7fd6;
+    --color-sky: #7aa2c0;
+    --color-blush: #e0837e;
+    --color-sage: #729b79;
+    --color-nav-active: #d7e2f2;
+    --color-focus: var(--color-iris);
+    --color-overlay: rgba(245, 242, 235, 0.88);
+    --color-danger: #ba1a1a;
+    --color-danger-ink: #fff7f5;
+    /* Legacy StyleX names → ceramic accents */
+    --color-copper: var(--color-iris);
+    --color-copper-ink: #faf8f5;
+    --color-live: var(--color-sage);
+    --color-live-ink: #faf8f5;
+
+    --background: var(--color-bg);
+    --foreground: var(--color-ink);
+    --card: var(--color-surface);
+    --card-foreground: var(--color-ink);
+    --popover: var(--color-surface);
+    --popover-foreground: var(--color-ink);
+    --primary: var(--color-ink);
+    --primary-foreground: var(--color-surface);
+    --secondary: var(--color-raised);
+    --secondary-foreground: var(--color-ink);
+    --muted: var(--color-raised);
+    --muted-foreground: var(--color-muted);
+    --accent: var(--color-raised);
+    --accent-foreground: var(--color-ink);
+    --destructive: var(--color-danger);
+    --destructive-foreground: var(--color-danger-ink);
+    --success: var(--color-sage);
+    --success-foreground: var(--color-live-ink);
+    --warning: var(--color-iris);
+    --warning-foreground: var(--color-copper-ink);
+    --border: var(--color-line);
+    --input: var(--color-raised);
+    --ring: var(--color-focus);
+    --radius: 1.5rem;
+
+    --surface-1: var(--color-bg);
+    --surface-2: var(--color-surface);
+    --surface-3: var(--color-surface);
+    --surface-4: var(--color-raised);
+
+    --cyan: var(--color-sky);
+    --cyan-foreground: var(--color-ink);
+    --amber: var(--color-iris);
+    --amber-foreground: var(--color-copper-ink);
+
+    --font-display: 'Fraunces', 'Iowan Old Style', 'Palatino Linotype', serif;
+    --font-family:
+      'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI',
+      sans-serif;
+    --font-editorial: 'Newsreader', 'Iowan Old Style', Georgia, serif;
+    --font-hand: 'Caveat', 'Segoe Script', cursive;
+    --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
     --font-size-xs: 0.75rem;
     --font-size-sm: 0.875rem;
     --font-size-base: 1rem;
     --font-size-lg: 1.125rem;
     --font-size-xl: 1.25rem;
-    --font-size-2xl: 1.5rem;
-    --font-size-3xl: 1.875rem;
-    
-    /* Shadows */
-    --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-    --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
-    --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
-    --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
-    
-    /* Transitions */
-    --transition-fast: 150ms ease;
-    --transition-normal: 250ms ease;
-    --transition-slow: 350ms ease;
+    --font-size-2xl: 1.75rem;
+    --font-size-3xl: 2.5rem;
+
+    --spacing-xs: 0.25rem;
+    --spacing-sm: 0.5rem;
+    --spacing-md: 0.75rem;
+    --spacing-lg: 1.25rem;
+    --spacing-xl: 2rem;
+    --spacing-2xl: 3rem;
+
+    --shadow-card:
+      0 4px 20px -2px rgba(45, 42, 41, 0.04), 0 1px 3px 0 rgba(45, 42, 41, 0.02);
+    --shadow-hud:
+      0 20px 40px -8px rgba(35, 33, 40, 0.08),
+      0 6px 14px -3px rgba(35, 33, 40, 0.04),
+      inset 0 1px 0 0 rgba(255, 255, 255, 0.9);
+
+    --brand-atmosphere: url('/brand/atmosphere.jpg');
+    --brand-sidebar-veil: color-mix(
+      in srgb,
+      var(--color-canvas) 70%,
+      transparent
+    );
+    --brand-column-veil: color-mix(in srgb, var(--color-bg) 82%, transparent);
+
+    --transition-fast: 140ms ease;
+    --transition-normal: 240ms ease;
+    --transition-slow: 360ms ease;
+
+    color-scheme: light;
   }
 
   .dark {
-    /* Light theme override for dark mode */
-    --background: 0 0% 100%;
-    --foreground: 220 13% 18%;
-    --card: 0 0% 100%;
-    --card-foreground: 220 13% 18%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 220 13% 18%;
-    --primary: 220 13% 15%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 220 14% 96%;
-    --secondary-foreground: 220 13% 18%;
-    --muted: 220 14% 96%;
-    --muted-foreground: 220 9% 46%;
-    --accent: 220 14% 96%;
-    --accent-foreground: 220 13% 18%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --success: 142 76% 36%;
-    --success-foreground: 355 100% 97%;
-    --warning: 38 92% 50%;
-    --warning-foreground: 48 96% 89%;
-    --border: 220 13% 91%;
-    --input: 220 13% 91%;
-    --ring: 220 13% 15%;
+    /* Nocturnal obsidian / iris — not Booth teal/copper */
+    --color-canvas: #121018;
+    --color-bg: #16141c;
+    --color-surface: #1e1b26;
+    --color-raised: #2a2633;
+    --color-ink: #f3f0e9;
+    --color-muted: #9a94a4;
+    --color-line: rgba(243, 240, 233, 0.1);
+    --color-iris: #9b91e0;
+    --color-sky: #8bb4cc;
+    --color-blush: #e8938e;
+    --color-sage: #86b08c;
+    --color-nav-active: #3a3558;
+    --color-focus: var(--color-iris);
+    --color-overlay: rgba(22, 20, 28, 0.88);
+    --color-danger: #e0837e;
+    --color-danger-ink: #1c1a19;
+    --color-copper: var(--color-iris);
+    --color-copper-ink: #f3f0e9;
+    --color-live: var(--color-sage);
+    --color-live-ink: #121018;
 
-    /* Light surface variations for dark mode */
-    --surface-1: 0 0% 100%;
-    --surface-2: 220 14% 98%;
-    --surface-3: 220 14% 96%;
-    --surface-4: 220 14% 94%;
+    --shadow-card:
+      0 4px 20px -2px rgba(0, 0, 0, 0.28), 0 1px 3px 0 rgba(0, 0, 0, 0.18);
+    --shadow-hud:
+      0 20px 40px -8px rgba(0, 0, 0, 0.45), 0 6px 14px -3px rgba(0, 0, 0, 0.28),
+      inset 0 1px 0 0 rgba(255, 255, 255, 0.06);
+
+    --brand-sidebar-veil: color-mix(
+      in srgb,
+      var(--color-canvas) 88%,
+      transparent
+    );
+    --brand-column-veil: color-mix(in srgb, var(--color-bg) 92%, transparent);
+
+    color-scheme: dark;
   }
 }
 
 @layer base {
   * {
-    border-color: hsl(var(--border));
+    box-sizing: border-box;
+    border-color: var(--color-line);
   }
+
   body {
-    background-color: hsl(var(--background));
-    color: hsl(var(--foreground));
+    position: relative;
+    background-color: var(--color-bg);
+    color: var(--color-ink);
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    line-height: 1.25;
+    color: var(--color-ink);
+    margin: 0;
+  }
+
+  p {
+    margin: 0;
+  }
+
+  /* Default field chrome lives in `base` so StyleX component styles can override it. */
+  input[type='text'],
+  input[type='email'],
+  input[type='password'],
+  input[type='search'],
+  textarea,
+  select {
+    background-color: var(--color-raised);
+    border: 1px solid var(--color-line);
+    color: var(--color-ink);
+    font-family: inherit;
+    font-size: inherit;
+    border-radius: 8px;
+  }
+
+  input:focus,
+  textarea:focus,
+  select:focus {
+    border-color: var(--color-iris);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-iris) 40%, transparent);
+    outline: none;
+  }
+
+  input[type='search']::-webkit-search-decoration,
+  input[type='search']::-webkit-search-cancel-button,
+  input[type='search']::-webkit-search-results-button,
+  input[type='search']::-webkit-search-results-decoration {
+    display: none;
   }
 }
 
-/* Custom styles for the app */
 html {
   overflow: hidden;
+  height: 100%;
+}
+
+.murmullo-atmosphere-shell {
+  background-color: var(--color-bg);
+  background-image: var(--brand-atmosphere);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
 }
 
 body {
   margin: 0;
   padding: 0;
+  position: relative;
   font-family: var(--font-family);
-  font-size: 16px;
-  line-height: 1.6;
+  font-size: 14px;
+  line-height: 1.5;
   font-weight: 400;
   letter-spacing: -0.01em;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  color: hsl(var(--foreground));
+  color: var(--color-ink);
+  background: var(--color-bg);
+  height: 100%;
 }
 
-/* Custom scrollbars */
+#root {
+  height: 100%;
+  isolation: isolate;
+}
+
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 
 ::-webkit-scrollbar-track {
-  background: hsl(var(--muted));
-  border-radius: 4px;
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: hsl(var(--muted-foreground));
-  border-radius: 4px;
+  background: var(--color-raised);
+  border-radius: 9999px;
 }
 
-::-webkit-scrollbar-thumb:hover {
-  background: hsl(var(--foreground));
-}
-
-/* Firefox scrollbars */
 * {
   scrollbar-width: thin;
-  scrollbar-color: hsl(var(--muted-foreground)) hsl(var(--muted));
+  scrollbar-color: var(--color-raised) transparent;
 }
 
-/* Typography enhancements */
-h1, h2, h3, h4, h5, h6 {
-  font-weight: 600;
-  letter-spacing: -0.02em;
-  line-height: 1.3;
-  color: hsl(var(--foreground));
+.font-mono {
+  font-family: var(--font-mono);
 }
 
-.font-light {
-  font-weight: 300;
+.murmullo-tooltip {
+  position: relative;
+  display: inline-flex;
 }
 
-.font-normal {
-  font-weight: 400;
-}
-
-.font-medium {
+.murmullo-tooltip__bubble {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 8px);
+  z-index: 60;
+  pointer-events: none;
+  white-space: nowrap;
+  padding: 5px 8px;
+  border-radius: 0.5rem;
+  background: var(--color-ink);
+  color: var(--color-surface);
+  font-family: var(--font-family);
+  font-size: 11px;
   font-weight: 500;
+  line-height: 14px;
+  letter-spacing: 0.01em;
+  box-shadow: var(--shadow-hud);
+  opacity: 0;
+  transform: translateY(4px);
+  transition:
+    opacity 140ms ease,
+    transform 140ms ease;
+  transition-delay: 0ms;
 }
 
-.font-semibold {
-  font-weight: 600;
-}
-
-.font-bold {
-  font-weight: 700;
-}
-
-/* Enhanced text styles */
-.text-elegant {
-  font-weight: 300;
-  letter-spacing: 0.005em;
-  line-height: 1.5;
-}
-
-.text-refined {
-  font-weight: 400;
-  letter-spacing: -0.005em;
-  line-height: 1.5;
-}
-
-@keyframes spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-/* Enhanced form controls styling */
-[data-radix-popper-content-wrapper] {
-  z-index: 50;
-}
-
-/* ComboBox and Select improvements */
-.combobox-trigger {
-  background-color: hsl(var(--background)) !important;
-  border-color: hsl(var(--border)) !important;
-  color: hsl(var(--foreground)) !important;
-}
-
-.combobox-trigger:hover {
-  background-color: hsl(var(--accent)) !important;
-  color: hsl(var(--accent-foreground)) !important;
-}
-
-.combobox-content {
-  background-color: hsl(var(--popover)) !important;
-  border-color: hsl(var(--border)) !important;
-  color: hsl(var(--popover-foreground)) !important;
-  box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1) !important;
-}
-
-.combobox-item {
-  color: hsl(var(--popover-foreground)) !important;
-}
-
-.combobox-item:hover {
-  background-color: hsl(var(--accent)) !important;
-  color: hsl(var(--accent-foreground)) !important;
-}
-
-.combobox-item[data-selected="true"] {
-  background-color: hsl(var(--accent)) !important;
-  color: hsl(var(--accent-foreground)) !important;
-}
-
-/* Force background colors for ComboBox components */
-[data-radix-popper-content-wrapper] [role="combobox"] {
-  background-color: hsl(var(--background)) !important;
-  border-color: hsl(var(--border)) !important;
-  color: hsl(var(--foreground)) !important;
-}
-
-[data-radix-popper-content-wrapper] [cmdk-root] {
-  background-color: hsl(var(--popover)) !important;
-  border-color: hsl(var(--border)) !important;
-}
-
-[data-radix-popper-content-wrapper] [cmdk-input] {
-  background-color: hsl(var(--popover)) !important;
-  color: hsl(var(--popover-foreground)) !important;
-}
-
-[data-radix-popper-content-wrapper] [cmdk-item] {
-  background-color: hsl(var(--popover)) !important;
-  color: hsl(var(--popover-foreground)) !important;
-}
-
-[data-radix-popper-content-wrapper] [cmdk-item]:hover {
-  background-color: hsl(var(--accent)) !important;
-  color: hsl(var(--accent-foreground)) !important;
-}
-
-/* Input field improvements */
-input[type="text"], 
-input[type="email"], 
-input[type="password"],
-textarea,
-select {
-  background-color: hsl(var(--background));
-  border-color: hsl(var(--border));
-  color: hsl(var(--foreground));
-}
-
-input[type="text"]:focus, 
-input[type="email"]:focus, 
-input[type="password"]:focus,
-textarea:focus,
-select:focus {
-  border-color: hsl(var(--ring));
-  box-shadow: 0 0 0 2px hsl(var(--ring) / 0.2);
-}
-
-/* Button improvements */
-button {
-  transition: all 0.2s ease;
-}
-
-button:hover {
-  transform: translateY(-1px);
-}
-
-button:active {
+.murmullo-tooltip:hover .murmullo-tooltip__bubble,
+.murmullo-tooltip:focus-within .murmullo-tooltip__bubble {
+  opacity: 1;
   transform: translateY(0);
+  transition-delay: 220ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

@@ -1,3 +1,3 @@
 pub mod manager;
 
-pub use manager::{ModelManager, ModelInfo};
+pub use manager::{ModelInfo, ModelManager, PARAKEET_NAME};

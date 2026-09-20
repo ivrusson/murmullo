@@ -1,336 +1,440 @@
 import { useState, useEffect } from 'react';
-import { Container, Section, Flex } from '@/components/layout';
-import { Button, Alert, AlertDescription, Switch, ComboBox, Slider } from '@/components/ui';
-import { Heading, Text, Icon } from '@/components/ui';
-import { Settings, Save, RotateCcw, Info, Keyboard, Mic, Volume2 } from 'lucide-react';
-import { toast } from 'sonner';
-import { configService } from '../../services/tauri';
-import type { AppConfig } from '../../types';
+import { toast } from '@/components/ui-system/toast';
+import * as stylex from '@stylexjs/stylex';
+import { configService, runtimeService } from '@/services/tauri';
+import { GlobalSelectors } from '@/components/GlobalSelectors';
+import { HotkeyRecorder } from '@/components/HotkeyRecorder';
+import { OverlayStylePicker } from '@/components/OverlayStylePicker';
+import { ThemeToggle } from '@/components/ThemeToggle';
+import { LocaleToggle } from '@/components/LocaleToggle';
+import { useT, mapBackendError } from '@/i18n';
+import { Switch } from '@/components/ui-system/Switch';
+import { Select } from '@/components/ui-system/Select';
+import { ComboBox } from '@/components/ui-system/ComboBox';
+import { useAppConfig } from '@/contexts/AppConfigContext';
+import { validateHotkey } from '@/lib/hotkey';
+import type { AppConfig, LlmProviderInfo } from '@/types';
+import { PageFrame } from '@/components/ui-system/PageFrame';
+import { PageHeader } from '@/components/ui-system/PageHeader';
+import { Surface } from '@/components/ui-system/Surface';
+import { Button } from '@/components/ui-system/Button';
+import { color, font, space } from '@/styles/tokens.stylex';
+import { sx } from '@/components/ui-system/sx';
+import { FeedbackLaunchButtons } from '@/components/FeedbackDialog';
+
+const styles = stylex.create({
+  grid: {
+    display: 'grid',
+    gridTemplateColumns: {
+      default: '1fr 1fr',
+      '@media (max-width: 1100px)': '1fr',
+    },
+    gap: space.md,
+    alignItems: 'start',
+  },
+  kicker: {
+    margin: 0,
+    marginBottom: space.md,
+    color: color.muted,
+    fontFamily: font.sans,
+    fontSize: 12,
+    fontWeight: 600,
+    letterSpacing: '0.02em',
+  },
+  copy: {
+    margin: 0,
+    color: '#5A5551',
+    fontFamily: font.sans,
+    fontSize: 13,
+    lineHeight: '20px',
+  },
+  error: {
+    color: color.danger,
+    fontSize: 13,
+  },
+  toggle: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: space.md,
+    paddingBlock: 14,
+    paddingInline: 16,
+    borderRadius: 20,
+    backgroundColor: '#FFFFFF',
+    borderColor: color.line,
+    borderStyle: 'solid',
+    borderWidth: 1,
+    cursor: 'pointer',
+    marginBottom: space.sm,
+  },
+  label: {
+    margin: 0,
+    fontFamily: font.sans,
+    fontSize: 14,
+    fontWeight: 600,
+  },
+  themeWrap: {
+    marginTop: space.md,
+  },
+  field: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 6,
+    marginBottom: space.sm,
+  },
+  fieldLabel: {
+    margin: 0,
+    fontFamily: font.sans,
+    fontSize: 12,
+    fontWeight: 600,
+    color: color.muted,
+  },
+  helpActions: {
+    marginTop: space.md,
+  },
+});
 
 export function SettingsPage() {
+  const t = useT();
+  const { refreshConfig } = useAppConfig();
   const [config, setConfig] = useState<AppConfig | null>(null);
   const [hasChanges, setHasChanges] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [hotkeyError, setHotkeyError] = useState<string | null>(null);
+  const [providers, setProviders] = useState<LlmProviderInfo[]>([]);
 
   useEffect(() => {
-    loadConfig();
-  }, []);
-
-  const loadConfig = async () => {
-    try {
-      setIsLoading(true);
-      console.log('🔄 Loading configuration from backend...');
-      const appConfig = await configService.getConfig();
-      console.log('⚙️ Configuration loaded:', appConfig);
-      setConfig(appConfig);
-    } catch (error) {
-      console.error('❌ Error loading configuration:', error);
-      toast.error('Failed to load settings', {
-        description: 'Could not fetch configuration from backend'
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    const load = async () => {
+      try {
+        setIsLoading(true);
+        setConfig(await configService.getConfig());
+      } catch {
+        toast.error(t('settings.loadFailed'));
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    void load();
+    runtimeService
+      .listLlmProviders()
+      .then(setProviders)
+      .catch(() => undefined);
+  }, [t]);
 
   const handleSave = async () => {
     if (!config) return;
-    
-    try {
-      console.log('💾 Saving configuration...');
-      
-      // Update audio configuration
-      await configService.updateAudioConfig(
-        config.audio.noise_reduction,
-        config.audio.normalization,
-        config.audio.silence_threshold
-      );
-      
-      // Update VAD configuration
-      await configService.updateVadConfig(
-        config.vad.enabled,
-        config.vad.sensitivity,
-        config.vad.silence_timeout
-      );
-      
-      // Update Whisper configuration
-      await configService.updateWhisperConfig(
-        config.whisper.temperature,
-        config.whisper.best_of,
-        config.whisper.default_language
-      );
-      
-      setHasChanges(false);
-      toast.success('Settings saved', {
-        description: 'Your preferences have been updated successfully'
-      });
-    } catch (error) {
-      console.error('❌ Error saving configuration:', error);
-      toast.error('Save failed', {
-        description: 'Could not save your settings'
-      });
+    const hotkeyProblem = validateHotkey(
+      config.hotkeys.push_to_talk,
+      config.hotkeys.toggle_recording ? [config.hotkeys.toggle_recording] : []
+    );
+    if (hotkeyProblem) {
+      setHotkeyError(hotkeyProblem);
+      toast.error(hotkeyProblem);
+      return;
     }
-  };
-
-  const handleReset = async () => {
     try {
-      console.log('🔄 Resetting configuration to defaults...');
-      await configService.resetToDefaults();
-      await loadConfig();
+      await Promise.all([
+        configService.updateAudioConfig(
+          config.audio.noise_reduction,
+          config.audio.normalization,
+          config.audio.silence_threshold
+        ),
+        configService.updateRuntimeConfig(
+          config.runtime.llm_enabled,
+          config.runtime.llm_model,
+          config.runtime.default_language,
+          config.runtime.llm_provider || 'ollama'
+        ),
+        configService.updateHotkeyConfig(
+          config.hotkeys.push_to_talk,
+          config.hotkeys.enabled
+        ),
+      ]);
       setHasChanges(false);
-      toast.info('Settings reset', {
-        description: 'All settings have been reset to default values'
-      });
+      setHotkeyError(null);
+      await refreshConfig();
+      toast.success(t('settings.saved'));
     } catch (error) {
-      console.error('❌ Error resetting configuration:', error);
-      toast.error('Reset failed', {
-        description: 'Could not reset settings to defaults'
-      });
+      const message = mapBackendError(error);
+      setHotkeyError(message);
+      toast.error(message);
     }
   };
 
   return (
-    <div className="min-h-full bg-background">
-      <Container size="lg" padding="sm">
-        <Section spacing="md">
-          {/* Header */}
-          <Flex direction="column" gap="xs" className="mb-6">
-            <Flex align="center" gap="sm">
-              <Icon icon={Settings} size="lg" color="primary" />
-              <Heading level={1} size="xl" className="font-semibold">Settings</Heading>
-            </Flex>
-            <Text color="muted" size="sm" className="font-light">Configure Murmullo to your preferences</Text>
-          </Flex>
+    <PageFrame>
+      <PageHeader
+        title={t('settings.title')}
+        lede={t('settings.lede')}
+        actions={
+          <Button
+            onClick={() => void handleSave()}
+            disabled={
+              !hasChanges || isLoading || !config?.hotkeys.push_to_talk?.trim()
+            }
+          >
+            {t('common.save')}
+          </Button>
+        }
+      />
 
-          {isLoading ? (
-            <div className="flex justify-center items-center py-8">
-              <Flex justify="center" align="center" gap="sm">
-                <Icon icon={Settings} size="sm" className="animate-spin" />
-                <Text className="font-light">Loading settings...</Text>
-              </Flex>
+      {isLoading ? (
+        <div {...sx(styles.grid)}>
+          <AppearanceCard />
+          <Surface>
+            <p {...sx(styles.copy)}>{t('settings.loading')}</p>
+          </Surface>
+        </div>
+      ) : !config ? (
+        <div {...sx(styles.grid)}>
+          <AppearanceCard />
+          <Surface>
+            <p {...sx(styles.copy)}>{t('settings.desktopOnly')}</p>
+          </Surface>
+        </div>
+      ) : (
+        <div {...sx(styles.grid)}>
+          <AppearanceCard />
+
+          <Surface>
+            <p {...sx(styles.kicker)}>{t('settings.inputDevice')}</p>
+            <GlobalSelectors />
+          </Surface>
+
+          <Surface>
+            <p {...sx(styles.kicker)}>{t('settings.globalShortcuts')}</p>
+            <HotkeyRecorder
+              value={config.hotkeys.push_to_talk}
+              occupied={
+                config.hotkeys.toggle_recording
+                  ? [config.hotkeys.toggle_recording]
+                  : []
+              }
+              onChange={async next => {
+                await configService.updateHotkeyConfig(
+                  next,
+                  config.hotkeys.enabled
+                );
+                setHotkeyError(null);
+                setConfig({
+                  ...config,
+                  hotkeys: { ...config.hotkeys, push_to_talk: next },
+                });
+                await refreshConfig();
+                toast.success(t('settings.hotkeyUpdated'));
+              }}
+            />
+            {hotkeyError ? <p {...sx(styles.error)}>{hotkeyError}</p> : null}
+            <p {...sx(styles.copy)}>{t('settings.hotkeyHint')}</p>
+          </Surface>
+
+          <Surface>
+            <p {...sx(styles.kicker)}>{t('settings.cancelAudio')}</p>
+            <Toggle
+              label={t('settings.noise')}
+              description={t('settings.noiseHint')}
+              checked={config.audio.noise_reduction}
+              onChange={checked => {
+                setConfig({
+                  ...config,
+                  audio: { ...config.audio, noise_reduction: checked },
+                });
+                setHasChanges(true);
+              }}
+            />
+            <Toggle
+              label={t('settings.normalize')}
+              description={t('settings.normalizeHint')}
+              checked={config.audio.normalization}
+              onChange={checked => {
+                setConfig({
+                  ...config,
+                  audio: { ...config.audio, normalization: checked },
+                });
+                setHasChanges(true);
+              }}
+            />
+          </Surface>
+
+          <Surface>
+            <p {...sx(styles.kicker)}>{t('settings.llmRewrite')}</p>
+            <Toggle
+              label={t('settings.rewrite')}
+              description={llmDescription(config.runtime, providers, t)}
+              checked={config.runtime.llm_enabled}
+              onChange={checked => {
+                setConfig({
+                  ...config,
+                  runtime: { ...config.runtime, llm_enabled: checked },
+                });
+                setHasChanges(true);
+              }}
+            />
+            <div {...sx(styles.field)}>
+              <p {...sx(styles.fieldLabel)}>{t('settings.provider')}</p>
+              <Select
+                value={config.runtime.llm_provider || 'ollama'}
+                onValueChange={value => {
+                  const next = providers.find(item => item.id === value);
+                  const keepModel =
+                    next?.models.includes(config.runtime.llm_model) ?? false;
+                  setConfig({
+                    ...config,
+                    runtime: {
+                      ...config.runtime,
+                      llm_provider: value,
+                      llm_model: keepModel
+                        ? config.runtime.llm_model
+                        : (next?.default_model ?? config.runtime.llm_model),
+                    },
+                  });
+                  setHasChanges(true);
+                }}
+                items={(providers.length > 0
+                  ? providers
+                  : [
+                      {
+                        id: 'ollama',
+                        label: 'Ollama',
+                        installed: true,
+                      },
+                      { id: 'kimi', label: 'Kimi', installed: false },
+                      { id: 'kilo', label: 'Kilo', installed: false },
+                      { id: 'cursor', label: 'Cursor', installed: false },
+                      { id: 'claude', label: 'Claude', installed: false },
+                    ]
+                ).map(item => ({
+                  value: item.id,
+                  label: item.installed
+                    ? item.label
+                    : t('settings.notInstalled', { label: item.label }),
+                }))}
+                placeholder={t('settings.chooseProvider')}
+              />
             </div>
-          ) : !config ? (
-            <Alert variant="destructive">
-              <AlertDescription>
-                Failed to load settings. Please try refreshing the page.
-              </AlertDescription>
-            </Alert>
-          ) : (
-            <>
-              {/* Save/Reset Actions */}
-              {hasChanges && (
-                <Alert className="mb-6">
-                  <Icon icon={Info} size="sm" />
-                  <AlertDescription>
-                    You have unsaved changes. Don't forget to save your settings.
-                  </AlertDescription>
-                </Alert>
-              )}
+            <div {...sx(styles.field)}>
+              <p {...sx(styles.fieldLabel)}>{t('settings.model')}</p>
+              <ComboBox
+                value={config.runtime.llm_model}
+                onValueChange={value => {
+                  if (!value) return;
+                  setConfig({
+                    ...config,
+                    runtime: { ...config.runtime, llm_model: value },
+                  });
+                  setHasChanges(true);
+                }}
+                options={modelOptions(config, providers)}
+                placeholder={t('settings.chooseModel')}
+                searchPlaceholder={t('settings.searchModel')}
+                emptyText={t('settings.noModels')}
+              />
+            </div>
+            {selectedProvider(config, providers)?.hint ? (
+              <p {...sx(styles.copy)}>
+                {selectedProvider(config, providers)?.hint}
+              </p>
+            ) : null}
+          </Surface>
+        </div>
+      )}
+      <HelpCard />
+    </PageFrame>
+  );
+}
 
-              <Flex justify="between" align="center" className="mb-6">
-                <Text color="muted" size="sm" className="font-light">Configure your preferences below</Text>
-                <Flex gap="sm">
-                  <Button variant="outline" onClick={handleReset} size="sm">
-                    <Icon icon={RotateCcw} size="sm" />
-                    Reset
-                  </Button>
-                  <Button onClick={handleSave} disabled={!hasChanges} size="sm">
-                    <Icon icon={Save} size="sm" />
-                    Save Changes
-                  </Button>
-                </Flex>
-              </Flex>
+function AppearanceCard() {
+  const t = useT();
+  return (
+    <Surface>
+      <p {...sx(styles.kicker)}>{t('settings.appearance')}</p>
+      <p {...sx(styles.copy)}>{t('settings.appearanceBody')}</p>
+      <div {...sx(styles.themeWrap)}>
+        <ThemeToggle />
+      </div>
+      <p {...sx(styles.kicker)} style={{ marginTop: 16 }}>
+        {t('settings.language')}
+      </p>
+      <p {...sx(styles.copy)}>{t('settings.languageBody')}</p>
+      <div {...sx(styles.themeWrap)}>
+        <LocaleToggle />
+      </div>
+      <OverlayStylePicker />
+    </Surface>
+  );
+}
 
-              {/* Hotkeys Settings */}
-              <div className="mb-8">
-                <Flex align="center" gap="sm" className="mb-4">
-                  <Icon icon={Keyboard} size="md" color="primary" />
-                  <Heading level={2} size="lg" className="font-semibold text-foreground">Hotkeys</Heading>
-                </Flex>
-                <Text size="sm" color="muted" className="font-light mb-4">
-                  Configure keyboard shortcuts for recording functionality.
-                </Text>
-                
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center py-3 px-4 bg-surface-2 border border-border/50 rounded-lg">
-                    <Flex direction="column" gap="xs">
-                      <Text weight="medium" className="text-foreground">Push to Talk</Text>
-                      <Text size="sm" color="muted" className="font-light">Hold to record while pressed</Text>
-                    </Flex>
-                    <div className="px-3 py-1 bg-primary/10 text-primary border border-primary/20 rounded-md font-mono text-sm">
-                      {config.hotkeys.push_to_talk}
-                    </div>
-                  </div>
-                </div>
-              </div>
+function HelpCard() {
+  const t = useT();
+  return (
+    <Surface>
+      <p {...sx(styles.kicker)}>{t('feedback.helpTitle')}</p>
+      <p {...sx(styles.copy)}>{t('feedback.helpBody')}</p>
+      <div {...sx(styles.helpActions)}>
+        <FeedbackLaunchButtons />
+      </div>
+    </Surface>
+  );
+}
 
-              {/* Divider */}
-              <div className="border-t border-border/50 mb-8"></div>
+function selectedProvider(
+  config: AppConfig,
+  providers: LlmProviderInfo[]
+): LlmProviderInfo | undefined {
+  const id = config.runtime.llm_provider || 'ollama';
+  return providers.find(item => item.id === id);
+}
 
-              {/* Audio Settings */}
-              <div className="mb-8">
-                <Flex align="center" gap="sm" className="mb-4">
-                  <Icon icon={Volume2} size="md" color="primary" />
-                  <Heading level={2} size="lg" className="font-semibold text-foreground">Audio</Heading>
-                </Flex>
-                <Text size="sm" color="muted" className="font-light mb-4">
-                  Configure audio input settings for optimal recording quality.
-                </Text>
-                
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="flex flex-col gap-2">
-                    <Text weight="medium" className="text-foreground text-sm">Sample Rate</Text>
-                    <ComboBox
-                      options={[
-                        { value: "22050", label: "22.05 kHz" },
-                        { value: "44100", label: "44.1 kHz" },
-                        { value: "48000", label: "48 kHz" }
-                      ]}
-                      value={config.audio.sample_rate.toString()}
-                      onValueChange={(value) => {
-                        setConfig({...config, audio: {...config.audio, sample_rate: Number(value)}});
-                        setHasChanges(true);
-                      }}
-                      triggerClassName="h-9"
-                    />
-                  </div>
-                  
-                  <div className="flex flex-col gap-2">
-                    <Text weight="medium" className="text-foreground text-sm">Channels</Text>
-                    <ComboBox
-                      options={[
-                        { value: "1", label: "Mono" },
-                        { value: "2", label: "Stereo" }
-                      ]}
-                      value={config.audio.channels.toString()}
-                      onValueChange={(value) => {
-                        setConfig({...config, audio: {...config.audio, channels: Number(value)}});
-                        setHasChanges(true);
-                      }}
-                      triggerClassName="h-9"
-                    />
-                  </div>
-                  
-                  <div className="flex flex-col gap-2">
-                    <Text weight="medium" className="text-foreground text-sm">Bit Depth</Text>
-                    <ComboBox
-                      options={[
-                        { value: "16", label: "16-bit" },
-                        { value: "24", label: "24-bit" },
-                        { value: "32", label: "32-bit" }
-                      ]}
-                      value={config.audio.bit_depth.toString()}
-                      onValueChange={(value) => {
-                        setConfig({...config, audio: {...config.audio, bit_depth: Number(value)}});
-                        setHasChanges(true);
-                      }}
-                      triggerClassName="h-9"
-                    />
-                  </div>
-                </div>
+function modelOptions(config: AppConfig, providers: LlmProviderInfo[]) {
+  const provider = selectedProvider(config, providers);
+  const models = new Set(provider?.models ?? []);
+  if (config.runtime.llm_model) {
+    models.add(config.runtime.llm_model);
+  }
+  return Array.from(models).map(value => ({ value, label: value }));
+}
 
-                <div className="mt-4 space-y-3">
-                  <div className="flex items-center justify-between py-2">
-                    <Flex direction="column" gap="xs">
-                      <Text weight="medium" className="text-foreground text-sm">Noise Reduction</Text>
-                      <Text size="xs" color="muted" className="font-light">Reduce background noise</Text>
-                    </Flex>
-                    <Switch 
-                      checked={config.audio.noise_reduction}
-                      onCheckedChange={(checked) => {
-                        setConfig({...config, audio: {...config.audio, noise_reduction: checked}});
-                        setHasChanges(true);
-                      }}
-                    />
-                  </div>
-                  
-                  <div className="flex items-center justify-between py-2">
-                    <Flex direction="column" gap="xs">
-                      <Text weight="medium" className="text-foreground text-sm">Normalization</Text>
-                      <Text size="xs" color="muted" className="font-light">Normalize audio levels</Text>
-                    </Flex>
-                    <Switch 
-                      checked={config.audio.normalization}
-                      onCheckedChange={(checked) => {
-                        setConfig({...config, audio: {...config.audio, normalization: checked}});
-                        setHasChanges(true);
-                      }}
-                    />
-                  </div>
-                </div>
-              </div>
+function llmDescription(
+  runtime: AppConfig['runtime'],
+  providers: LlmProviderInfo[],
+  t: (
+    key: import('@/i18n').AppMessageKey,
+    params?: import('@/i18n').TranslateParams
+  ) => string
+): string {
+  const provider =
+    providers.find(item => item.id === (runtime.llm_provider || 'ollama'))
+      ?.label ??
+    runtime.llm_provider ??
+    'Ollama';
+  if ((runtime.llm_provider || 'ollama') === 'ollama') {
+    return t('settings.llmDescUrl', {
+      model: runtime.llm_model,
+      provider,
+      url: runtime.llm_url,
+    });
+  }
+  return t('settings.llmDesc', { model: runtime.llm_model, provider });
+}
 
-              {/* Divider */}
-              <div className="border-t border-border/50 mb-8"></div>
-
-              {/* Whisper Settings */}
-              <div className="mb-8">
-                <Flex align="center" gap="sm" className="mb-4">
-                  <Icon icon={Mic} size="md" color="primary" />
-                  <Heading level={2} size="lg" className="font-semibold text-foreground">Whisper Configuration</Heading>
-                </Flex>
-                <Text size="sm" color="muted" className="font-light mb-4">
-                  Configure Whisper model parameters for transcription.
-                </Text>
-                
-                <div className="grid grid-cols-2 gap-4 mb-4">
-                  <div className="flex flex-col gap-2">
-                    <Text weight="medium" className="text-foreground text-sm">Temperature</Text>
-                    <Slider
-                      value={[config.whisper.temperature]}
-                      onValueChange={(value) => {
-                        setConfig({...config, whisper: {...config.whisper, temperature: value[0]}});
-                        setHasChanges(true);
-                      }}
-                      max={1}
-                      min={0}
-                      step={0.1}
-                      className="w-full"
-                    />
-                    <Text size="xs" color="muted" className="font-light text-center">{config.whisper.temperature}</Text>
-                  </div>
-                  
-                  <div className="flex flex-col gap-2">
-                    <Text weight="medium" className="text-foreground text-sm">Best Of</Text>
-                    <ComboBox
-                      options={[
-                        { value: "1", label: "1" },
-                        { value: "3", label: "3" },
-                        { value: "5", label: "5" }
-                      ]}
-                      value={config.whisper.best_of.toString()}
-                      onValueChange={(value) => {
-                        setConfig({...config, whisper: {...config.whisper, best_of: Number(value)}});
-                        setHasChanges(true);
-                      }}
-                      triggerClassName="h-9"
-                    />
-                  </div>
-                </div>
-                
-                <div className="flex flex-col gap-2">
-                  <Text weight="medium" className="text-foreground text-sm">Default Language</Text>
-                  <ComboBox
-                    options={[
-                      { value: "auto", label: "Auto-detect" },
-                      { value: "en", label: "English" },
-                      { value: "es", label: "Spanish" },
-                      { value: "fr", label: "French" },
-                      { value: "de", label: "German" }
-                    ]}
-                    value={config.whisper.default_language || 'auto'}
-                    onValueChange={(value) => {
-                      setConfig({...config, whisper: {...config.whisper, default_language: value === 'auto' ? undefined : value}});
-                      setHasChanges(true);
-                    }}
-                    triggerClassName="h-9"
-                  />
-                </div>
-              </div>
-            </>
-          )}
-        </Section>
-      </Container>
-    </div>
+function Toggle({
+  label,
+  description,
+  checked,
+  onChange,
+}: {
+  label: string;
+  description: string;
+  checked: boolean;
+  onChange: (value: boolean) => void;
+}) {
+  return (
+    <label {...sx(styles.toggle)}>
+      <div>
+        <p {...sx(styles.label)}>{label}</p>
+        <p {...sx(styles.copy)}>{description}</p>
+      </div>
+      <Switch checked={checked} onCheckedChange={onChange} />
+    </label>
   );
 }
