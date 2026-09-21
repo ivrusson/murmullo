@@ -9,6 +9,15 @@ Murmullo is still **beta**. Versions stay on the `0.x` line until the product is
 
 ## [Unreleased]
 
+### Added
+
+- Guided `install.sh` / `install.command` (macOS, Linux) and `install.ps1` / `install.cmd` (Windows)
+  so cloning the repo is enough to get a toolchain before native OS packages exist
+- README screenshot, usage, roadmap, and acknowledgments for the open-source stack
+- [docs/INSTALL.md](docs/INSTALL.md) with installer flags and first-run troubleshooting
+- [docs/USAGE.md](docs/USAGE.md) getting-started guide: dictation flow, Parakeet vs optional LLM,
+  and Settings / dictionary
+
 ### Fixed
 
 - Crash reporter is a self-contained `crash://` page (no Vite, no Google Fonts). If the dev server

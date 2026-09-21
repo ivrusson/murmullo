@@ -46,7 +46,7 @@ error, plus Grabar / Parar / Cancelar. The system hotkey remains the primary tri
 | Piece            | How                                                                                      |
 | ---------------- | ---------------------------------------------------------------------------------------- |
 | `nemo-speech`    | PATH or `NEMO_SPEECH_BIN`. `serve --host 127.0.0.1 --port 18765 --no-ui`                 |
-| Parakeet Q8 GGUF | `~/Library/Application Support/murmullo/models/`                                         |
+| Parakeet Q8 GGUF | `~/.murmullo/models/`                                                                    |
 | LLM              | Ollama-compatible HTTP (`127.0.0.1:11434`). Optional: on failure, paste STT + dictionary |
 
 ## Workstation pages
