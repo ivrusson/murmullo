@@ -15,6 +15,20 @@ Murmullo is still **beta**. Versions stay on the `0.x` line until the product is
   so cloning the repo is enough to get a toolchain before native OS packages exist
 - README screenshot, usage, roadmap, and acknowledgments for the open-source stack
 - [docs/INSTALL.md](docs/INSTALL.md) with installer flags and first-run troubleshooting
+- [docs/USAGE.md](docs/USAGE.md) getting-started guide: dictation flow, Parakeet vs optional LLM,
+  and Settings / dictionary
+
+### Fixed
+
+- Crash reporter is a self-contained `crash://` page (no Vite, no Google Fonts). If the dev server
+  dies, the pending report in `~/.murmullo` still opens.
+
+### Changed
+
+- `pnpm release:dry` promotes Keep a Changelog, bumps package/Cargo/tauri versions, and skips the
+  Tauri build. Real releases still refuse 1.x while we are in beta.
+- `pnpm changelog` drafts Unreleased notes with `cursor-agent` (Keep a Changelog). Do not use
+  conventional-changelog.
 
 ## [0.7.0] - 2026-09-19
 

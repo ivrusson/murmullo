@@ -6,6 +6,7 @@ LLM for dictionary learning. **macOS** is the supported platform; paste on other
 | Doc                                      | What it is                                |
 | ---------------------------------------- | ----------------------------------------- |
 | [../README.md](../README.md)             | Product, setup, usage                     |
+| [../docs/USAGE.md](../docs/USAGE.md)     | First day, models, and Settings           |
 | [../docs/INSTALL.md](../docs/INSTALL.md) | Guided installer from a git clone         |
 | [REWRITE.md](./REWRITE.md)               | Architecture: pipeline, runtimes, success |
 | [DECISIONS.md](./DECISIONS.md)           | Why the wrapper and UI are built this way |

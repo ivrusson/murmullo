@@ -4,10 +4,15 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
-use tauri::{AppHandle, Manager};
+use tauri::http::{header::CONTENT_TYPE, Request, Response, StatusCode};
+use tauri::{AppHandle, Manager, UriSchemeContext};
 
 const CRASH_WINDOW_LABEL: &str = "crash-reporter";
+const CRASH_PROTOCOL: &str = "crash";
+const CRASH_PAGE_URL: &str = "crash://localhost/";
 const MAX_STACK_CHARS: usize = 16_384;
+const CRASH_HTML: &[u8] = include_bytes!("../../crash.html");
+pub const FRONTEND_CAPTURE_SCRIPT: &str = include_str!("../crash-capture.js");
 
 static SHOWING_REPORTER: AtomicBool = AtomicBool::new(false);
 
@@ -203,33 +208,61 @@ pub fn install_panic_hook() {
     }));
 }
 
+pub fn serve_crash_html(
+    _ctx: UriSchemeContext<'_, impl tauri::Runtime>,
+    request: Request<Vec<u8>>,
+) -> Response<&'static [u8]> {
+    let path = request.uri().path();
+    if path.ends_with("favicon.ico") {
+        return Response::builder()
+            .status(StatusCode::NOT_FOUND)
+            .body(&b""[..])
+            .expect("empty favicon response");
+    }
+    Response::builder()
+        .status(StatusCode::OK)
+        .header(CONTENT_TYPE, "text/html; charset=utf-8")
+        .header("Cache-Control", "no-store")
+        .body(CRASH_HTML)
+        .expect("crash html response")
+}
+
+fn crash_page_url() -> tauri::WebviewUrl {
+    tauri::WebviewUrl::CustomProtocol(CRASH_PAGE_URL.parse().expect("crash protocol url is valid"))
+}
+
+fn window_uses_embedded_page(win: &tauri::WebviewWindow) -> bool {
+    win.url()
+        .map(|url| url.scheme() == CRASH_PROTOCOL)
+        .unwrap_or(false)
+}
+
 fn create_crash_window(app: &AppHandle) -> Result<tauri::WebviewWindow, String> {
-    tauri::WebviewWindowBuilder::new(
-        app,
-        CRASH_WINDOW_LABEL,
-        tauri::WebviewUrl::App("crash.html".into()),
-    )
-    .title("Murmullo")
-    .inner_size(520.0, 640.0)
-    .min_inner_size(420.0, 480.0)
-    .resizable(true)
-    .decorations(true)
-    .always_on_top(false)
-    .skip_taskbar(false)
-    .visible(true)
-    .focused(true)
-    .center()
-    .build()
-    .map_err(|e| format!("create crash reporter: {e}"))
+    tauri::WebviewWindowBuilder::new(app, CRASH_WINDOW_LABEL, crash_page_url())
+        .title("Murmullo")
+        .inner_size(520.0, 640.0)
+        .min_inner_size(420.0, 480.0)
+        .resizable(true)
+        .decorations(true)
+        .always_on_top(false)
+        .skip_taskbar(false)
+        .visible(true)
+        .focused(true)
+        .center()
+        .build()
+        .map_err(|e| format!("create crash reporter: {e}"))
 }
 
 pub fn show_crash_reporter(app: &AppHandle) -> Result<(), String> {
     if let Some(win) = app.get_webview_window(CRASH_WINDOW_LABEL) {
-        win.show().map_err(|e| e.to_string())?;
-        let _ = win.unminimize();
-        let _ = win.set_focus();
-        SHOWING_REPORTER.store(true, Ordering::SeqCst);
-        return Ok(());
+        if window_uses_embedded_page(&win) {
+            win.show().map_err(|e| e.to_string())?;
+            let _ = win.unminimize();
+            let _ = win.set_focus();
+            SHOWING_REPORTER.store(true, Ordering::SeqCst);
+            return Ok(());
+        }
+        let _ = win.destroy();
     }
     create_crash_window(app)?;
     SHOWING_REPORTER.store(true, Ordering::SeqCst);
@@ -266,6 +299,15 @@ pub fn show_crash_reporter_window(app: AppHandle) -> Result<(), String> {
 }
 
 #[tauri::command]
+pub fn close_crash_reporter_window(app: AppHandle) -> Result<(), String> {
+    if let Some(win) = app.get_webview_window(CRASH_WINDOW_LABEL) {
+        win.close().map_err(|e| e.to_string())?;
+    }
+    SHOWING_REPORTER.store(false, Ordering::SeqCst);
+    Ok(())
+}
+
+#[tauri::command]
 pub fn report_frontend_crash(
     app: AppHandle,
     message: String,
@@ -296,5 +338,14 @@ mod tests {
             pending_path(),
             crate::paths::app_dir().join("crash-pending.json")
         );
+    }
+
+    #[test]
+    fn crash_html_does_not_depend_on_vite() {
+        let html = include_str!("../../crash.html");
+        assert!(!html.contains("type=\"module\""));
+        assert!(!html.contains("/src/"));
+        assert!(!html.contains("fonts.googleapis.com"));
+        assert!(html.contains("__TAURI_INTERNALS__"));
     }
 }

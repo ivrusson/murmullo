@@ -25,9 +25,9 @@ Close it; dictation keeps working from the tray and the overlay.
 4. Hold **`⌘ ⌥ T`** (default; change it in Settings), speak, release.
 5. Corrected text is pasted at the caret. Raw STT and the final line land in History.
 
-Typical uses: notes while walking around the keyboard, drafting mail, thinking out loud, capturing
-an idea before it evaporates. The companion on Home is only a presence. The work happens in the
-other app.
+Full walkthrough (models, dictionary, Settings): [docs/USAGE.md](docs/USAGE.md). Typical uses: notes
+while walking around the keyboard, drafting mail, thinking out loud, capturing an idea before it
+evaporates. The companion on Home is only a presence. The work happens in the other app.
 
 | Page        | What it is                                                  |
 | ----------- | ----------------------------------------------------------- |
@@ -41,7 +41,7 @@ other app.
 The overlay is a HUD: idle, recording, processing, done, error, plus Record / Stop / Cancel. The
 system hotkey remains the primary trigger so Murmullo never has to steal focus.
 
-Optional **Ollama** (or another local HTTP LLM): if it is down, dictation still pastes STT +
+Optional **Ollama** (or Kimi / Kilo / Cursor / Claude): if it is down, dictation still pastes STT +
 dictionary. Learning does not live in the speech model. Parakeet is not fine-tuned; the dictionary
 and prompt are the layer that corrects itself.
 
@@ -64,7 +64,8 @@ Tools, Node.js 18+, Rust, and pnpm, offers to install what is missing, then runs
 can compile (`--build`) or launch (`--dev`). It does **not** fetch the 714 MB speech model — that
 stays a first-run step in Runtimes, with checksums.
 
-Flags and troubleshooting: [docs/INSTALL.md](docs/INSTALL.md).
+Flags and troubleshooting: [docs/INSTALL.md](docs/INSTALL.md). Using the app, models, and Settings:
+[docs/USAGE.md](docs/USAGE.md).
 
 ### Requirements
 
@@ -103,7 +104,8 @@ Murmullo is a thin desktop wrapper, not an inference engine:
 - **TextInserter** clipboard + Cmd+V on the macOS main thread
 - Overlay + tray for hold-to-talk without stealing focus
 
-The GGUF lives under `~/Library/Application Support/murmullo/models/`.
+The GGUF lives under `~/.murmullo/models/`. How the speech model, dictionary, and optional LLM fit
+together: [docs/USAGE.md](docs/USAGE.md).
 
 ## What's next
 

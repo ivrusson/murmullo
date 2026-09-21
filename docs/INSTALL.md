@@ -82,6 +82,8 @@ Then inside Murmullo:
    `nemo-speech serve` on localhost.
 3. **Dictate** — hold `⌘ ⌥ T` (default, configurable in Settings), speak, release.
 
+Using the app after that — models, dictionary, Settings: [USAGE.md](USAGE.md).
+
 Optional: install [Ollama](https://ollama.com) if you want an LLM rewrite on top of the dictionary.
 Dictation already pastes STT + dictionary when the LLM is down.
 
