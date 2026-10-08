@@ -66,6 +66,8 @@ type MascotProps = {
   sceneMode: MurmulloSceneMode;
   level?: number;
   onPointerDown?: PointerEventHandler<HTMLDivElement>;
+  onPointerEnter?: PointerEventHandler<HTMLDivElement>;
+  onPointerLeave?: PointerEventHandler<HTMLDivElement>;
   onContextMenu?: MouseEventHandler<HTMLDivElement>;
 };
 
@@ -74,6 +76,8 @@ export function HudMascot({
   sceneMode,
   level,
   onPointerDown,
+  onPointerEnter,
+  onPointerLeave,
   onContextMenu,
 }: MascotProps) {
   const className =
@@ -85,7 +89,10 @@ export function HudMascot({
   return (
     <div
       className={className}
+      data-hud-hit=""
       onPointerDown={onPointerDown}
+      onPointerEnter={onPointerEnter}
+      onPointerLeave={onPointerLeave}
       onContextMenu={onContextMenu}
     >
       <div className="hud-mascot-scene">
@@ -122,20 +129,22 @@ export function HudStage({
   children: ReactNode;
 }) {
   const rest = mode === 'rest';
+  const chromeProps = {
+    'data-hud-hit': '',
+    onPointerDown,
+    onPointerEnter,
+    onPointerLeave,
+  };
 
   if (style === 'card') {
     return (
-      <div
-        className={`hud-stage is-card${rest ? ' is-rest' : ''}`}
-        onPointerEnter={onPointerEnter}
-        onPointerLeave={onPointerLeave}
-      >
+      <div className={`hud-stage is-card${rest ? ' is-rest' : ''}`}>
         {mascot}
         <div
           className="hud-card"
           data-mode={mode}
           style={{ width }}
-          onPointerDown={onPointerDown}
+          {...chromeProps}
         >
           <div key={mode} className="hud-card-body">
             {children}
@@ -147,16 +156,12 @@ export function HudStage({
 
   if (style === 'island') {
     return (
-      <div
-        className={`hud-stage is-island${rest ? ' is-rest' : ''}`}
-        onPointerEnter={onPointerEnter}
-        onPointerLeave={onPointerLeave}
-      >
+      <div className={`hud-stage is-island${rest ? ' is-rest' : ''}`}>
         <div
           className="hud-pill"
           data-mode={mode}
           style={{ width }}
-          onPointerDown={onPointerDown}
+          {...chromeProps}
         >
           {mascot}
           {rest ? null : (
@@ -170,17 +175,13 @@ export function HudStage({
   }
 
   return (
-    <div
-      className={`hud-stage is-pill${rest ? ' is-rest' : ''}`}
-      onPointerEnter={onPointerEnter}
-      onPointerLeave={onPointerLeave}
-    >
+    <div className={`hud-stage is-pill${rest ? ' is-rest' : ''}`}>
       {mascot}
       <div
         className="hud-pill"
         data-mode={mode}
         style={{ width: rest ? 0 : width }}
-        onPointerDown={onPointerDown}
+        {...chromeProps}
       >
         {rest ? null : (
           <div key={mode} className="hud-body">
@@ -266,7 +267,10 @@ export function ProcessingContent({ message }: { message?: string }) {
   return (
     <span className="hud-copy">
       <span className="hud-label muted">
-        {translateBackendMessage(message || 'status.processing')}
+        {translateBackendMessage(
+          message || 'status.processing',
+          'errors.status.processing'
+        )}
       </span>
     </span>
   );
@@ -595,8 +599,10 @@ export function CardProcessingContent({ message }: { message?: string }) {
     <CardFrame
       title={t('hud.processing')}
       subtitle={
-        translateBackendMessage(message || 'status.processing') ||
-        t('hud.organizing')
+        translateBackendMessage(
+          message || 'status.processing',
+          'errors.status.processing'
+        ) || t('hud.organizing')
       }
     >
       <span className="hud-card-orb" aria-hidden />
@@ -1050,6 +1056,7 @@ export function HudLayer({
     <div
       className={`hud-layer ${className}${open ? ' is-open' : ' is-leaving'}`}
       data-no-drag
+      data-hud-hit=""
     >
       {open ? children : cached.current}
     </div>

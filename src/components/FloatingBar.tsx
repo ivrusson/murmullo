@@ -10,6 +10,7 @@ import {
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { currentMonitor, getCurrentWindow } from '@tauri-apps/api/window';
+import { useOverlayClickThrough } from '@/hooks/useOverlayClickThrough';
 import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion';
 import { hotkeyParts } from '@/lib/hotkey';
 import {
@@ -114,8 +115,9 @@ const HUD_LEAVE_MS = 200;
 const HUD_TOAST_EXTRA = 40;
 const HUD_MENU_EXTRA = 180;
 const HUD_MODAL_EXTRA = 220;
-const HUD_SHADOW_PAD_X = 56;
-const HUD_SHADOW_PAD_Y = 72;
+/** Room for soft shadows without a huge invisible click shield around the HUD. */
+const HUD_SHADOW_PAD_X = 40;
+const HUD_SHADOW_PAD_Y = 48;
 
 const HUD_MODE_SIZE: Record<HudMode, { width: number; height: number }> = {
   rest: { width: HUD_MASCOT_RENDER_SIZE, height: HUD_MASCOT_RENDER_SIZE },
@@ -275,6 +277,17 @@ function isNoDragTarget(target: EventTarget | null): boolean {
     target instanceof Element &&
     Boolean(
       target.closest('[data-no-drag], button, a, textarea, input, select, kbd')
+    )
+  );
+}
+
+function isEditableOverlayTarget(target: EventTarget | null): boolean {
+  return (
+    target instanceof Element &&
+    Boolean(
+      target.closest(
+        'textarea, input:not([type="button"]):not([type="submit"]):not([type="reset"]), [contenteditable="true"]'
+      )
     )
   );
 }
@@ -821,6 +834,7 @@ export const FloatingBar: React.FC = () => {
     event => {
       pointerDownRef.current = true;
       window.clearTimeout(leaveTimerRef.current);
+      window.getSelection()?.removeAllRanges();
       if (event.button !== 0 || isNoDragTarget(event.target)) return;
       draggingRef.current = true;
       const win = currentOverlayWindow();
@@ -861,6 +875,15 @@ export const FloatingBar: React.FC = () => {
     }, HUD_LEAVE_MS);
   }, []);
 
+  useOverlayClickThrough({
+    enabled: isTauriRuntime(),
+    isDragging: () => draggingRef.current || pointerDownRef.current,
+    onHitChange: over => {
+      if (over) enterReady();
+      else leaveReady();
+    },
+  });
+
   const applyLayout = useCallback((layout: OverlayLayout) => {
     const nextStyle = normalizeOverlayStyle(layout.style);
     setCompactPref(layout.compact);
@@ -887,6 +910,17 @@ export const FloatingBar: React.FC = () => {
       });
       setMode(preview);
     }
+  }, []);
+
+  useEffect(() => {
+    const preventOverlayTextSelection = (event: Event) => {
+      if (isEditableOverlayTarget(event.target)) return;
+      event.preventDefault();
+    };
+    document.addEventListener('selectstart', preventOverlayTextSelection);
+    return () => {
+      document.removeEventListener('selectstart', preventOverlayTextSelection);
+    };
   }, []);
 
   useEffect(() => {
@@ -926,7 +960,12 @@ export const FloatingBar: React.FC = () => {
       }
       if (payload.state === 'processing') {
         expectingCancelRef.current = false;
-        setProcessingMessage(payload.message || 'status.processing');
+        const nextMessage = payload.message?.trim() || 'status.processing';
+        const { code } = parseCodedError(nextMessage);
+        // Only keep coded status.* keys in HUD state; raw debug lines stay in logs.
+        setProcessingMessage(
+          code.startsWith('status.') ? nextMessage : 'status.processing'
+        );
         setMode('processing');
         setMenuOpen(false);
         return;
@@ -1189,6 +1228,8 @@ export const FloatingBar: React.FC = () => {
       sceneMode={sceneMode}
       level={audioLevel}
       onPointerDown={beginChromeDrag}
+      onPointerEnter={enterReady}
+      onPointerLeave={leaveReady}
       onContextMenu={openQuickMenu}
     />
   );

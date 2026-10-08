@@ -611,10 +611,8 @@ async fn run_transcription(
         runtime.set_language(language.clone());
     }
 
-    emit_processing(
-        &app_handle,
-        &format!("POST {stt_url}/v1/audio/transcriptions"),
-    );
+    crate::pipeline::log("stt", format!("POST {stt_url}/v1/audio/transcriptions"));
+    emit_processing(&app_handle, &crate::codes::code("status.sendingStt"));
     let raw = transcribe_with_runtime(&state, &processed_audio).await?;
     let raw = postprocess_transcription(raw);
     if raw.is_empty() {

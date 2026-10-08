@@ -490,9 +490,9 @@ export const es = {
       noLlmBackend: 'Sin backend LLM.',
       llmModelUnavailable:
         '{model} no está disponible en {label}. El dictado sigue sin LLM.',
-      sendingStt: 'Enviando a nemo-speech…',
-      preparingAudio: 'Preparando audio para nemo-speech…',
-      llmRewrite: 'Reescribiendo con LLM…',
+      sendingStt: 'Enviando audio…',
+      preparingAudio: 'Preparando audio…',
+      llmRewrite: 'Reescribiendo…',
       dictionary: 'Diccionario y puntuación…',
       processing: 'Procesando…',
     },
