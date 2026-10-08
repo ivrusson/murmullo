@@ -488,9 +488,9 @@ export const en: Messages = {
       noLlmBackend: 'No LLM backend.',
       llmModelUnavailable:
         '{model} is not available on {label}. Dictation continues without LLM.',
-      sendingStt: 'Sending to nemo-speech…',
-      preparingAudio: 'Preparing audio for nemo-speech…',
-      llmRewrite: 'Rewriting with LLM…',
+      sendingStt: 'Sending audio…',
+      preparingAudio: 'Preparing audio…',
+      llmRewrite: 'Rewriting…',
       dictionary: 'Dictionary and punctuation…',
       processing: 'Processing…',
     },

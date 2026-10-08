@@ -1,7 +1,9 @@
 import { hasMessage, t } from './store';
 import type { TranslateParams } from './t';
 
-const CODE_RE = /^[a-z][a-z0-9_]+(?:\.[a-z][a-z0-9_]+)+$/;
+// Backend codes are dotted ids: snake_case (`audio.too_short`) or camelCase
+// (`status.sendingStt`). Each segment starts with a lowercase letter.
+const CODE_RE = /^[a-z][a-zA-Z0-9_]+(?:\.[a-z][a-zA-Z0-9_]+)+$/;
 
 function extractRaw(error: unknown): string {
   if (typeof error === 'string') return error;
@@ -43,24 +45,38 @@ export function parseCodedError(raw: string): {
 
 function looksTechnical(raw: string): boolean {
   return (
+    /\bhttps?:\/\//i.test(raw) ||
     /^(https?:\/\/|\/|file:|[A-Za-z]:\\)/.test(raw) ||
+    /\b(GET|POST|PUT|DELETE|PATCH)\s+\S+/i.test(raw) ||
+    /\/v1\/|127\.0\.0\.1|localhost:\d+/i.test(raw) ||
     /^[a-z0-9._-]+@[a-z0-9.-]+$/i.test(raw) ||
     raw.includes('::') ||
     /poisoned|mutex|anyhow|cpal|InvokeError|__TAURI/i.test(raw)
   );
 }
 
+type BackendMessageFallback =
+  'errors.generic' | 'errors.dictation' | 'errors.status.processing';
+
 export function translateBackendMessage(
   raw: unknown,
-  fallbackKey: 'errors.generic' | 'errors.dictation' = 'errors.generic'
+  fallbackKey: BackendMessageFallback = 'errors.generic'
 ): string {
   const text = extractRaw(raw).trim();
   if (!text) return t(fallbackKey);
 
   const { code, params } = parseCodedError(text);
   const errorKey = `errors.${code}`;
-  if (CODE_RE.test(code) && hasMessage(errorKey)) {
-    return t(errorKey as Parameters<typeof t>[0], params);
+  if (CODE_RE.test(code)) {
+    if (hasMessage(errorKey)) {
+      return t(errorKey as Parameters<typeof t>[0], params);
+    }
+    // Unknown coded id — never show the raw key in UI.
+    return t(fallbackKey);
+  }
+  // Never surface raw HTTP/debug lines in the HUD or status rows.
+  if (looksTechnical(text) || text.length > 120) {
+    return t(fallbackKey);
   }
   return text;
 }
