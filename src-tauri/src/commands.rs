@@ -644,15 +644,9 @@ async fn run_transcription(
         ),
     );
 
-    let insert_mode = {
-        state
-            .insertion_mode
-            .lock()
-            .map_err(|e| e.to_string())?
-            .clone()
-    };
-    crate::insertion::paste_dictation(&app_handle, &final_text, &insert_mode);
-
+    // Insertion is owned by the overlay: it pastes on 'transcription-completed'
+    // when auto-insert is on, or via its Insert button otherwise. Pasting here
+    // too would double-insert.
     let duration_ms = (duration_seconds * 1000.0) as u64;
     let model_used = PARAKEET_NAME.to_string();
 
