@@ -32,7 +32,6 @@ extern "C" {
     ) -> *mut c_void;
     fn CGEventSetFlags(event: *mut c_void, flags: u64);
     fn CGEventPost(tap: u32, event: *mut c_void);
-    fn CGEventPostToPid(pid: i32, event: *mut c_void);
 }
 
 #[link(name = "ApplicationServices", kind = "framework")]
@@ -174,7 +173,7 @@ pub fn insert_via_accessibility(text: &str) -> bool {
     }
 }
 
-pub fn synthesize_paste(pid: i32) -> bool {
+pub fn synthesize_paste(_pid: i32) -> bool {
     let spec = super::paste_shortcut();
 
     unsafe {
@@ -183,8 +182,8 @@ pub fn synthesize_paste(pid: i32) -> bool {
             return false;
         }
 
-        let posted = post_key(source, spec.keycode, true, spec.flags, pid)
-            && post_key(source, spec.keycode, false, spec.flags, pid);
+        let posted = post_key(source, spec.keycode, true, spec.flags)
+            && post_key(source, spec.keycode, false, spec.flags);
 
         CFRelease(source);
         if !posted {
@@ -206,16 +205,16 @@ pub fn simulate_paste_osascript() -> bool {
         .unwrap_or(false)
 }
 
-fn post_key(source: *mut c_void, keycode: u16, down: bool, flags: u64, pid: i32) -> bool {
+fn post_key(source: *mut c_void, keycode: u16, down: bool, flags: u64) -> bool {
     unsafe {
         let event = CGEventCreateKeyboardEvent(source, keycode, down);
         if event.is_null() {
             return false;
         }
         CGEventSetFlags(event, flags);
-        if pid > 0 {
-            CGEventPostToPid(pid, event);
-        }
+        // Always via the HID tap: the target is already frontmost (restore_previous_app
+        // waits for it), and CGEventPostToPid silently drops key equivalents in many
+        // apps. Posting to both delivers Cmd+V twice.
         CGEventPost(HID_TAP, event);
         CFRelease(event);
         true
