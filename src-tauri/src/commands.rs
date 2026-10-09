@@ -645,9 +645,21 @@ async fn run_transcription(
         ),
     );
 
-    // Insertion is owned by the overlay: it pastes on 'transcription-completed'
-    // when auto-insert is on, or via its Insert button otherwise. Pasting here
-    // too would double-insert.
+    // Paste before the overlay hears about the text. Doing it again from the
+    // webview inserted the same line twice. The HUD Insert button still calls
+    // insert_text when auto-insert is off.
+    let auto_insert = {
+        let config = state.config.lock().map_err(|e| e.to_string())?;
+        config.ui.auto_insert
+    };
+    if auto_insert {
+        let insert_mode = state
+            .insertion_mode
+            .lock()
+            .map_err(|e| e.to_string())?
+            .clone();
+        crate::insertion::paste_dictation(&app_handle, &final_text, &insert_mode);
+    }
     let duration_ms = (duration_seconds * 1000.0) as u64;
     let model_used = PARAKEET_NAME.to_string();
 
@@ -806,6 +818,14 @@ pub async fn insert_text(
         .map_err(|e| e.to_string())?
         .clone();
     crate::insertion::paste_dictation(&app_handle, &text, &mode);
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn set_auto_insert(enabled: bool, state: State<'_, AppState>) -> Result<(), String> {
+    let mut config = state.config.lock().map_err(|e| e.to_string())?;
+    config.update_auto_insert(enabled);
+    config.save().map_err(|e| e.to_string())?;
     Ok(())
 }
 

@@ -5,7 +5,6 @@ import {
   useRef,
   useState,
   type MouseEventHandler,
-  type PointerEventHandler,
 } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
@@ -91,6 +90,18 @@ const RESULT_HOLD_MS = 8000;
 const TOAST_HOLD_MS = 3500;
 const CANCEL_HOLD_MS = 5000;
 const AUTO_INSERT_KEY = 'murmullo.autoInsertOnComplete';
+
+/** Missing key means on: dictation pastes into the focused field unless the user opts out. */
+function storedAutoInsert(): boolean | null {
+  try {
+    const value = window.localStorage.getItem(AUTO_INSERT_KEY);
+    if (value === '0') return false;
+    if (value === '1') return true;
+    return null;
+  } catch {
+    return null;
+  }
+}
 const RESULT_MODES: ReadonlySet<HudMode> = new Set([
   'done',
   'transcribed',
@@ -530,13 +541,9 @@ export const FloatingBar: React.FC = () => {
   const [placement, setPlacement] = useState<OverlayPlacement>('above');
   const [historyItems, setHistoryItems] = useState<HudHistoryItem[]>([]);
   const [historyQuery, setHistoryQuery] = useState('');
-  const [autoInsert, setAutoInsert] = useState(() => {
-    try {
-      return window.localStorage.getItem(AUTO_INSERT_KEY) === '1';
-    } catch {
-      return false;
-    }
-  });
+  const [autoInsert, setAutoInsert] = useState(
+    () => storedAutoInsert() ?? true
+  );
   const [sttLanguage, setSttLanguage] = useState('');
   const [modelId, setModelId] = useState('');
   const [errorOpenApp, setErrorOpenApp] = useState(false);
@@ -557,7 +564,9 @@ export const FloatingBar: React.FC = () => {
   const geometryRef = useRef<OverlayGeometry | null>(null);
   const applyingRef = useRef(false);
   const applyGenRef = useRef(0);
+  const autoInsertRef = useRef(autoInsert);
   modeRef.current = mode;
+  autoInsertRef.current = autoInsert;
   overlayStyleRef.current = overlayStyle;
   compactPrefRef.current = compactPref;
   menuOpenRef.current = menuOpen;
@@ -625,6 +634,14 @@ export const FloatingBar: React.FC = () => {
       window.localStorage.setItem(AUTO_INSERT_KEY, next ? '1' : '0');
     } catch {
       // overlay webview without storage
+    }
+    if (isTauriRuntime()) {
+      void insertionService.setAutoInsert(next).catch(error => {
+        console.error(
+          '[murmullo:overlay] auto-insert preference failed',
+          error
+        );
+      });
     }
   }, []);
 
@@ -856,12 +873,13 @@ export const FloatingBar: React.FC = () => {
     setMenuOpen(false);
   }, []);
 
-  const beginChromeDrag: PointerEventHandler<HTMLDivElement> = useCallback(
+  const beginChromeDrag: MouseEventHandler<HTMLDivElement> = useCallback(
     event => {
-      pointerDownRef.current = true;
       window.clearTimeout(leaveTimerRef.current);
-      window.getSelection()?.removeAllRanges();
+      pointerDownRef.current = true;
       if (event.button !== 0 || isNoDragTarget(event.target)) return;
+      // macOS window dragging needs the current native event to still be the
+      // left mouse-down. Clear selection only after the drag has been requested.
       draggingRef.current = true;
       const win = currentOverlayWindow();
       if (!win) {
@@ -939,13 +957,20 @@ export const FloatingBar: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    const preventOverlayTextSelection = (event: Event) => {
-      if (isEditableOverlayTarget(event.target)) return;
-      event.preventDefault();
+    const clearChromeSelection = () => {
+      if (pointerDownRef.current || draggingRef.current) return;
+      const active = document.activeElement;
+      if (isEditableOverlayTarget(active)) return;
+      const selection = window.getSelection();
+      if (!selection || selection.isCollapsed) return;
+      const node = selection.anchorNode;
+      const el = node instanceof Element ? node : (node?.parentElement ?? null);
+      if (isEditableOverlayTarget(el)) return;
+      selection.removeAllRanges();
     };
-    document.addEventListener('selectstart', preventOverlayTextSelection);
+    document.addEventListener('selectionchange', clearChromeSelection);
     return () => {
-      document.removeEventListener('selectstart', preventOverlayTextSelection);
+      document.removeEventListener('selectionchange', clearChromeSelection);
     };
   }, []);
 
@@ -964,6 +989,12 @@ export const FloatingBar: React.FC = () => {
         setModelId(
           config.ui?.selected_model || config.runtime?.llm_model || ''
         );
+        const stored = storedAutoInsert();
+        const fromConfig = config.ui?.auto_insert !== false;
+        setAutoInsert(stored ?? fromConfig);
+        if (stored !== null && stored !== fromConfig && isTauriRuntime()) {
+          void insertionService.setAutoInsert(stored).catch(() => undefined);
+        }
       })
       .catch(() => undefined);
 
@@ -997,6 +1028,8 @@ export const FloatingBar: React.FC = () => {
         return;
       }
       if (payload.state === 'done') {
+        // Pipeline already pasted. Don't reopen the result HUD on top of that.
+        if (autoInsertRef.current) return;
         setMode('done');
         return;
       }
@@ -1023,35 +1056,17 @@ export const FloatingBar: React.FC = () => {
 
     const unlistenTranscription = listen('transcription-completed', event => {
       const payload = event.payload as HudTranscription;
-      setTranscription(payload);
       setMenuOpen(false);
-      let shouldAutoInsert = false;
-      try {
-        shouldAutoInsert = window.localStorage.getItem(AUTO_INSERT_KEY) === '1';
-      } catch {
-        shouldAutoInsert = false;
-      }
-      if (shouldAutoInsert && payload.text?.trim()) {
-        void insertionService
-          .insertText(payload.text.trim())
-          .then(() => {
-            expectingCancelRef.current = false;
-            setMode('rest');
-            setTranscription(null);
-            setNotice(null);
-            setMenuOpen(false);
-            setModal(null);
-          })
-          .catch(error => {
-            console.error('[murmullo:overlay] auto-insert failed', error);
-            setMode('done');
-            setNotice({
-              kind: 'insert',
-              message: translate('hud.readyToInsert'),
-            });
-          });
+      // The pipeline pastes before this event. Inserting again here doubled the text.
+      if (autoInsertRef.current && payload.text?.trim()) {
+        expectingCancelRef.current = false;
+        setMode('rest');
+        setTranscription(null);
+        setNotice(null);
+        setModal(null);
         return;
       }
+      setTranscription(payload);
       setMode('done');
       setNotice({ kind: 'insert', message: translate('hud.readyToInsert') });
     });
@@ -1154,6 +1169,9 @@ export const FloatingBar: React.FC = () => {
   useEffect(() => {
     const endPointer = () => {
       pointerDownRef.current = false;
+      if (!isEditableOverlayTarget(document.activeElement)) {
+        window.getSelection()?.removeAllRanges();
+      }
       if (draggingRef.current) {
         draggingRef.current = false;
         saveOverlayPosition();
@@ -1253,7 +1271,7 @@ export const FloatingBar: React.FC = () => {
       placement={mascotPlacement(overlayStyle, mode)}
       sceneMode={sceneMode}
       level={audioLevel}
-      onPointerDown={beginChromeDrag}
+      onMouseDown={beginChromeDrag}
       onPointerEnter={enterReady}
       onPointerLeave={leaveReady}
       onContextMenu={openQuickMenu}
@@ -1492,7 +1510,7 @@ export const FloatingBar: React.FC = () => {
           mode={mode}
           width={contentSize(overlayStyle, mode).width}
           mascot={mascot}
-          onPointerDown={beginChromeDrag}
+          onMouseDown={beginChromeDrag}
           onPointerEnter={enterReady}
           onPointerLeave={leaveReady}
         >

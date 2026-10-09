@@ -3,10 +3,12 @@
 **Your ideas, closer.** Offline voice dictation for the Mac — a small presence that listens.
 
 Hold a shortcut, speak, release. Murmullo transcribes on your machine with **nemo-speech + Parakeet
-TDT 0.6B v3**, optionally rewrites with a local LLM and your dictionary, then pastes into the app
-you were already using.
+TDT 0.6B v3**, can clean the line up with the built-in on-device corrector (or an optional local
+LLM) and your dictionary, then pastes into the app you were already using.
 
-![Murmullo workstation on macOS — Home, recent dictations, and the hold-to-talk overlay](docs/screenshots/home.jpg)
+![Murmullo, the companion in the mist](public/brand/hero-mascot.jpg)
+
+![Murmullo Home — the companion in the banner, and the workstation around it](docs/screenshots/workstation.png)
 
 **Supported today:** macOS 12+. Pasting into the focused app on Windows and Linux is not implemented
 yet.
@@ -23,25 +25,30 @@ Close it; dictation keeps working from the tray and the overlay.
 2. On **Runtimes**, install nemo-speech and download Parakeet Q8 (~714 MB), then start STT.
 3. Click a text field in Slack, Mail, Notes, Cursor — anywhere.
 4. Hold **`⌘ ⌥ T`** (default; change it in Settings), speak, release.
-5. Corrected text is pasted at the caret. Raw STT and the final line land in History.
+5. The finished line is pasted at the caret when auto-insert is on (the default). Raw STT and the
+   final line land in History. Turn auto-insert off on the overlay if you want to press Insert
+   yourself.
 
 Full walkthrough (models, dictionary, Settings): [docs/USAGE.md](docs/USAGE.md). Typical uses: notes
 while walking around the keyboard, drafting mail, thinking out loud, capturing an idea before it
 evaporates. The companion on Home is only a presence. The work happens in the other app.
 
-| Page        | What it is                                                  |
-| ----------- | ----------------------------------------------------------- |
-| Home        | Greeting, recent murmurs, a way back into the last take     |
-| History     | Searchable raw STT and final text                           |
-| Dictionary  | Terms that reshape the rewrite prompt (names, jargon, tone) |
-| Runtimes    | STT / GGUF / optional LLM installer and logs                |
-| Permissions | macOS microphone, shortcut, and paste                       |
-| Settings    | Hotkey, mic, overlay style, theme, locale, LLM              |
+| Page        | What it is                                                      |
+| ----------- | --------------------------------------------------------------- |
+| Home        | Greeting, recent murmurs, a way back into the last take         |
+| History     | Searchable raw STT and final text                               |
+| Dictionary  | Terms that reshape the rewrite prompt (names, jargon, tone)     |
+| Runtimes    | STT / GGUF / optional LLM installer and logs                    |
+| Permissions | macOS microphone, shortcut, and paste                           |
+| Settings    | Hotkey, mic, overlay style, theme, locale, on-device correction |
 
-The overlay is a HUD: idle, recording, processing, done, error, plus Record / Stop / Cancel. The
-system hotkey remains the primary trigger so Murmullo never has to steal focus.
+The overlay is a HUD: idle, recording, processing, done, error, plus Record / Stop / Cancel. Drag
+the pill or the mascot to move it. Clicks on the empty padding around it pass through to the
+desktop. The system hotkey remains the primary trigger so Murmullo never has to steal focus.
 
-Optional **Ollama** (or Kimi / Kilo / Cursor / Claude): if it is down, dictation still pastes STT +
+Correction can stay on the machine. **Settings** downloads **Qwen 2.5 0.5B** (~480 MB) and keeps the
+Spanish and English prompts editable. Optional **Ollama** (or Kimi / Kilo / Cursor / Claude) is
+still there if you want a different local model. If neither is ready, dictation still pastes STT +
 dictionary. Learning does not live in the speech model. Parakeet is not fine-tuned; the dictionary
 and prompt are the layer that corrects itself.
 
@@ -115,7 +122,8 @@ Murmullo is **beta** (`0.x`). The next product work is packaging, then the rest 
   cloning the repo is no longer the default path
 - **`nemo-speech` as a Tauri `externalBin`** — fewer moving pieces on first run
 - **Paste on Windows and Linux** — same hold-to-talk promise as on the Mac
-- **LLM runtimes beyond Ollama HTTP** — keep rewrite local and optional
+- **More local correctors** — the built-in Qwen model is the default on-device path; other local
+  runtimes stay optional
 
 Out of scope for now: fine-tuning Parakeet, streaming / live captions, and any cloud STT or cloud
 LLM as a dependency.

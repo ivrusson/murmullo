@@ -123,6 +123,9 @@ export const insertionService = {
   async getMode(): Promise<InsertionMode> {
     return await invoke('get_insertion_mode');
   },
+  async setAutoInsert(enabled: boolean): Promise<void> {
+    return await invoke('set_auto_insert', { enabled });
+  },
 };
 
 export const permissionService = {

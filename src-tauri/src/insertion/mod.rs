@@ -29,6 +29,25 @@ impl InsertionMode {
     }
 }
 
+/// Where a synthesized paste is delivered. Exactly one path: posting to the
+/// HID tap and to a PID inserts the clipboard twice.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PasteDelivery {
+    /// Target app is already frontmost, so the system paste shortcut lands in its caret.
+    HidTap,
+    /// Target is not frontmost. Deliver only to that process so the shortcut
+    /// does not hit Murmullo's own window.
+    ToPid(i32),
+}
+
+pub fn paste_delivery(target_pid: i32, front_pid: Option<i32>) -> PasteDelivery {
+    if target_pid > 0 && front_pid != Some(target_pid) {
+        PasteDelivery::ToPid(target_pid)
+    } else {
+        PasteDelivery::HidTap
+    }
+}
+
 /// kVK_ANSI_V + kCGEventFlagMaskCommand on macOS.
 /// Enigo 0.2 posts V without these flags, so apps never see Cmd+V.
 #[cfg(target_os = "macos")]
@@ -276,6 +295,15 @@ mod tests {
             InsertionMode::from_str("keystroke"),
             InsertionMode::Keystroke
         ));
+    }
+
+    #[test]
+    fn paste_goes_to_one_destination() {
+        assert_eq!(paste_delivery(20, Some(20)), PasteDelivery::HidTap);
+        assert_eq!(paste_delivery(20, Some(10)), PasteDelivery::ToPid(20));
+        assert_eq!(paste_delivery(20, None), PasteDelivery::ToPid(20));
+        assert_eq!(paste_delivery(0, Some(10)), PasteDelivery::HidTap);
+        assert_eq!(paste_delivery(-1, None), PasteDelivery::HidTap);
     }
 
     #[test]

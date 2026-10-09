@@ -138,6 +138,9 @@ pub struct UiConfig {
     pub overlay_compact: bool,
     #[serde(default = "default_overlay_style")]
     pub overlay_style: String,
+    /// Paste the finished dictation into the focused field. On unless the user turns it off.
+    #[serde(default = "default_true")]
+    pub auto_insert: bool,
 }
 
 impl Default for UiConfig {
@@ -152,6 +155,7 @@ impl Default for UiConfig {
             overlay_y: None,
             overlay_compact: false,
             overlay_style: default_overlay_style(),
+            auto_insert: true,
         }
     }
 }
@@ -190,6 +194,7 @@ impl Default for AppConfig {
                 overlay_y: None,
                 overlay_compact: false,
                 overlay_style: default_overlay_style(),
+                auto_insert: true,
             },
         }
     }
@@ -294,11 +299,45 @@ impl AppConfig {
         self.ui.overlay_style = normalize_overlay_style(&style);
     }
 
+    pub fn update_auto_insert(&mut self, enabled: bool) {
+        self.ui.auto_insert = enabled;
+    }
+
     pub fn update_selected_model(&mut self, model_name: Option<String>) {
         self.ui.selected_model = model_name;
     }
 
     pub fn get_selected_model(&self) -> Option<String> {
         self.ui.selected_model.clone()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn auto_insert_defaults_on_when_missing_from_saved_config() {
+        let raw = r#"{
+            "audio": {
+                "sample_rate": 16000,
+                "channels": 1,
+                "bit_depth": 16,
+                "noise_reduction": true,
+                "normalization": true,
+                "silence_threshold": 0.01,
+                "min_audio_length": 0.3
+            },
+            "ui": {
+                "theme": "light",
+                "language": "es",
+                "show_debug_info": false,
+                "auto_save_transcriptions": true,
+                "selected_model": null
+            }
+        }"#;
+        let config: AppConfig = serde_json::from_str(raw).expect("config json");
+        assert!(config.ui.auto_insert);
+        assert!(AppConfig::default().ui.auto_insert);
     }
 }

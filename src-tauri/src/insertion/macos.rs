@@ -4,7 +4,7 @@
 //! caret. That false success used to skip Cmd+V, so text stayed on the clipboard.
 
 use objc2::runtime::{AnyObject, Bool};
-use objc2::{class, msg_send};
+use objc2::{class, msg_send, sel};
 use objc2_foundation::NSString;
 use std::ffi::{c_char, c_void, CStr};
 use std::sync::atomic::{AtomicI32, Ordering};
@@ -17,6 +17,7 @@ const OUR_BUNDLE_ID: &str = "com.murmullo.app";
 const HID_TAP: u32 = 0;
 const HID_SYSTEM_STATE: u32 = 1;
 const AX_SUCCESS: i32 = 0;
+const NS_APPLICATION_ACTIVATE_ALL_WINDOWS: u64 = 1 << 0;
 const NS_APPLICATION_ACTIVATE_IGNORING_OTHER_APPS: u64 = 1 << 1;
 
 static LAST_TARGET_PID: AtomicI32 = AtomicI32::new(-1);
@@ -32,6 +33,7 @@ extern "C" {
     ) -> *mut c_void;
     fn CGEventSetFlags(event: *mut c_void, flags: u64);
     fn CGEventPost(tap: u32, event: *mut c_void);
+    fn CGEventPostToPid(pid: i32, event: *mut c_void);
 }
 
 #[link(name = "ApplicationServices", kind = "framework")]
@@ -173,8 +175,11 @@ pub fn insert_via_accessibility(text: &str) -> bool {
     }
 }
 
-pub fn synthesize_paste(_pid: i32) -> bool {
+pub fn synthesize_paste(pid: i32) -> bool {
     let spec = super::paste_shortcut();
+    let front = frontmost_app().map(|(front_pid, _)| front_pid);
+    let delivery = super::paste_delivery(pid, front);
+    crate::pipeline::log("paste", format!("cmd-v via {delivery:?} front={front:?}"));
 
     unsafe {
         let source = CGEventSourceCreate(HID_SYSTEM_STATE);
@@ -182,8 +187,8 @@ pub fn synthesize_paste(_pid: i32) -> bool {
             return false;
         }
 
-        let posted = post_key(source, spec.keycode, true, spec.flags)
-            && post_key(source, spec.keycode, false, spec.flags);
+        let posted = post_key(source, spec.keycode, true, spec.flags, delivery)
+            && post_key(source, spec.keycode, false, spec.flags, delivery);
 
         CFRelease(source);
         if !posted {
@@ -205,17 +210,25 @@ pub fn simulate_paste_osascript() -> bool {
         .unwrap_or(false)
 }
 
-fn post_key(source: *mut c_void, keycode: u16, down: bool, flags: u64) -> bool {
+fn post_key(
+    source: *mut c_void,
+    keycode: u16,
+    down: bool,
+    flags: u64,
+    delivery: super::PasteDelivery,
+) -> bool {
     unsafe {
         let event = CGEventCreateKeyboardEvent(source, keycode, down);
         if event.is_null() {
             return false;
         }
         CGEventSetFlags(event, flags);
-        // Always via the HID tap: the target is already frontmost (restore_previous_app
-        // waits for it), and CGEventPostToPid silently drops key equivalents in many
-        // apps. Posting to both delivers Cmd+V twice.
-        CGEventPost(HID_TAP, event);
+        // One destination. HID reaches the frontmost caret; PostToPid is only
+        // the fallback when that app is not frontmost. Posting to both pastes twice.
+        match delivery {
+            super::PasteDelivery::ToPid(pid) => CGEventPostToPid(pid, event),
+            super::PasteDelivery::HidTap => CGEventPost(HID_TAP, event),
+        }
         CFRelease(event);
         true
     }
@@ -289,13 +302,27 @@ fn activate_pid(pid: i32) -> bool {
             crate::pipeline::log("paste", format!("restore: no app for pid={pid}"));
             return false;
         }
-        let ok: Bool = msg_send![
-            running,
-            activateWithOptions: NS_APPLICATION_ACTIVATE_IGNORING_OTHER_APPS
-        ];
-        let granted = ok.as_bool();
-        crate::pipeline::log("paste", format!("restore pid={pid} activate={granted}"));
-        granted
+        // AllWindows brings the text field's window forward. IgnoringOtherApps
+        // alone is ignored on recent macOS when Murmullo is the active app, so
+        // Cmd+V never reaches the caret. activateFromApplication: is the
+        // supported way for one app to yield to another (macOS 14+).
+        let options =
+            NS_APPLICATION_ACTIVATE_ALL_WINDOWS | NS_APPLICATION_ACTIVATE_IGNORING_OTHER_APPS;
+        let us: *mut AnyObject = msg_send![class!(NSRunningApplication), currentApplication];
+        if !us.is_null() {
+            let selector = sel!(activateFromApplication:options:);
+            let responds: Bool = msg_send![running, respondsToSelector: selector];
+            if responds.as_bool() {
+                let _: () = msg_send![running, activateFromApplication: us, options: options];
+            }
+        }
+        let ok: Bool = msg_send![running, activateWithOptions: options];
+        crate::pipeline::log(
+            "paste",
+            format!("restore pid={pid} activate={}", ok.as_bool()),
+        );
+        // The BOOL is unreliable: wait for the pid to become frontmost anyway.
+        true
     }
 }
 
