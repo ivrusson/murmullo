@@ -9,6 +9,8 @@ Murmullo is still **beta**. Versions stay on the `0.x` line until the product is
 
 ## [Unreleased]
 
+## [0.8.2] - 2026-10-09
+
 ### Fixed
 
 - Settings and crash reports show the same version as the release. 0.8.1 still reported 0.8.0.
