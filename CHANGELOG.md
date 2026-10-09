@@ -9,6 +9,10 @@ Murmullo is still **beta**. Versions stay on the `0.x` line until the product is
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-10-09
+
+On-device dictation correction, flexible push-to-talk chords, and easier source installs.
+
 ### Added
 
 - Guided `install.sh` / `install.command` (macOS, Linux) and `install.ps1` / `install.cmd` (Windows)
@@ -17,11 +21,11 @@ Murmullo is still **beta**. Versions stay on the `0.x` line until the product is
 - [docs/INSTALL.md](docs/INSTALL.md) with installer flags and first-run troubleshooting
 - [docs/USAGE.md](docs/USAGE.md) getting-started guide: dictation flow, Parakeet vs optional LLM,
   and Settings / dictionary
-
-### Fixed
-
-- Crash reporter is a self-contained `crash://` page (no Vite, no Google Fonts). If the dev server
-  dies, the pending report in `~/.murmullo` still opens.
+- Built-in on-device correction (Qwen 2.5 0.5B, ~480 MB) with in-app download and progress, so
+  transcripts can be cleaned up without a separate Ollama or HTTP LLM
+- Editable Spanish and English correction system prompts in Settings, with restore to the defaults
+- Push-to-talk shortcuts of one to three keys; the new chord applies immediately without restarting
+- App version shown in Settings → Help, sourced from the Cargo package version
 
 ### Changed
 
@@ -29,6 +33,15 @@ Murmullo is still **beta**. Versions stay on the `0.x` line until the product is
   Tauri build. Real releases still refuse 1.x while we are in beta.
 - `pnpm changelog` drafts Unreleased notes with `cursor-agent` (Keep a Changelog). Do not use
   conventional-changelog.
+- Hero mascot brand asset refreshed for the landing and workstation companion
+
+### Fixed
+
+- Crash reporter is a self-contained `crash://` page (no Vite, no Google Fonts). If the dev server
+  dies, the pending report in `~/.murmullo` still opens.
+- Floating bar hitbox only captures the HUD chrome, so clicks outside the pill pass through to the
+  desktop; status copy matches what the bar is doing
+- macOS dictation insert no longer pastes the same text twice into the focused app
 
 ## [0.7.0] - 2026-09-19
 

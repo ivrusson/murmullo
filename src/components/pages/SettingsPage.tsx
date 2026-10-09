@@ -9,7 +9,7 @@ import {
   BUILTIN_PROVIDER_ID,
   usesBuiltinCorrector,
 } from '@/correction/types';
-import { configService, runtimeService } from '@/services/tauri';
+import { appService, configService, runtimeService } from '@/services/tauri';
 import { GlobalSelectors } from '@/components/GlobalSelectors';
 import { HotkeyRecorder } from '@/components/HotkeyRecorder';
 import { OverlayStylePicker } from '@/components/OverlayStylePicker';
@@ -407,10 +407,24 @@ function AppearanceCard() {
 
 function HelpCard() {
   const t = useT();
+  const [version, setVersion] = useState<string | null>(null);
+
+  useEffect(() => {
+    void appService
+      .getVersion()
+      .then(setVersion)
+      .catch(() => undefined);
+  }, []);
+
   return (
     <Surface>
       <p {...sx(styles.kicker)}>{t('feedback.helpTitle')}</p>
       <p {...sx(styles.copy)}>{t('feedback.helpBody')}</p>
+      {version ? (
+        <p {...sx(styles.copy)} style={{ marginTop: 8 }}>
+          {t('feedback.version', { version })}
+        </p>
+      ) : null}
       <div {...sx(styles.helpActions)}>
         <FeedbackLaunchButtons />
       </div>
