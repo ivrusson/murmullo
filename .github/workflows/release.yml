@@ -77,7 +77,6 @@ jobs:
           releaseBody: 'See CHANGELOG.md for details'
           releaseDraft: false
           prerelease: false
-          args: '--config "{\\"bundle\\":{\\"identifier\\":\\"com.murmullo.app\\",\\"targets\\":\\"all\\"}}"'
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
