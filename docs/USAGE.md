@@ -127,8 +127,8 @@ not in Slack, Input Monitoring is still off for this binary.
 ### Shortcut
 
 **Settings → Global shortcuts.** Default hold-to-talk is `Cmd+Option+T`. Click the field and press
-the new combination (needs a modifier + a key). Esc cancels. Reserved chords (`Cmd+Space`,
-`Cmd+Tab`, `Cmd+Q`, …) are rejected.
+one to three keys (a single key, or a chord such as `Cmd+T` / `Cmd+Option+T`). Esc cancels.
+Reserved chords (`Cmd+Space`, `Cmd+Tab`, `Cmd+Q`, …) are rejected.
 
 ### Microphone and audio
 

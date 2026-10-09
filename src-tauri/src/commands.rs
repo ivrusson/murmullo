@@ -1013,13 +1013,19 @@ fn parse_ptt_shortcut(binding: &str) -> Result<Shortcut, String> {
         return Err(crate::codes::code("hotkey.empty"));
     }
 
-    let shortcut = Shortcut::from_str(binding).map_err(|_| crate::codes::code("hotkey.invalid"))?;
-
-    if shortcut.mods.is_empty() {
-        return Err(crate::codes::code("hotkey.needs_modifier"));
+    let token_count = binding
+        .split('+')
+        .map(str::trim)
+        .filter(|token| !token.is_empty())
+        .count();
+    if token_count == 0 {
+        return Err(crate::codes::code("hotkey.invalid"));
+    }
+    if token_count > 3 {
+        return Err(crate::codes::code("hotkey.too_many_keys"));
     }
 
-    Ok(shortcut)
+    Shortcut::from_str(binding).map_err(|_| crate::codes::code("hotkey.invalid"))
 }
 
 pub fn apply_registered_shortcut(app: &tauri::AppHandle) -> Result<(), String> {

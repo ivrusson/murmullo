@@ -227,7 +227,7 @@ export const en: Messages = {
     inputDevice: 'Input device',
     globalShortcuts: 'Global shortcuts',
     hotkeyHint:
-      'Hold to dictate. The new shortcut applies immediately, without restarting.',
+      'Hold to dictate. Use one, two or three keys. The new shortcut applies immediately, without restarting.',
     hotkeyUpdated: 'Shortcut updated',
     cancelAudio: 'Cancellation and audio',
     noise: 'Noise reduction',
@@ -293,8 +293,8 @@ export const en: Messages = {
     },
     sttLangAutoDetect: 'Auto-detect',
     ptt: 'Push to talk',
-    pttListening: 'Press the combination… Esc cancels',
-    pttIdle: 'Click and press the keys to change',
+    pttListening: 'Press 1–3 keys… Esc cancels',
+    pttIdle: 'Click and press one to three keys to change',
     listening: 'Listening…',
     hotkeySaveFailed: 'Could not save the shortcut',
     balanced: 'Balanced',
@@ -328,7 +328,7 @@ export const en: Messages = {
   },
   hotkey: {
     empty: 'The shortcut cannot be empty',
-    needsModifier: 'Include at least one modifier and a key',
+    tooManyKeys: 'Use at most three keys (for example Cmd+Option+T)',
     reserved: 'That shortcut is reserved by the system',
     conflict: 'That shortcut is already assigned to another action',
   },
@@ -450,8 +450,8 @@ export const en: Messages = {
     hotkey: {
       empty: 'The shortcut cannot be empty',
       invalid: 'Invalid shortcut',
-      needs_modifier:
-        'The shortcut needs at least one modifier (Cmd, Ctrl, Alt or Shift)',
+      too_many_keys:
+        'Use at most three keys (for example Cmd+Option+T)',
       conflict: 'That shortcut is already assigned to another action',
       register_failed:
         'Could not register the shortcut. It may be in use by the system or another app.',
