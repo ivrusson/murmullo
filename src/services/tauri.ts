@@ -226,3 +226,13 @@ export const overlayService = {
     });
   },
 };
+
+export const appService = {
+  async getVersion(): Promise<string> {
+    const env = await invoke<{ version: string }>('get_feedback_environment');
+    return env.version;
+  },
+  async getAppInfo(): Promise<string> {
+    return await invoke('get_app_info');
+  },
+};

@@ -331,6 +331,7 @@ export const es = {
     helpTitle: 'Ayuda',
     helpBody:
       'Abre un issue en GitHub. Nada se envía solo: revisas el formulario y pulsas Submit. Si no tienes cuenta, copia el informe.',
+    version: 'Versión {version}',
     reportBug: 'Reportar un error',
     requestFeature: 'Pedir una función',
     bugTitle: 'Reportar un error',
@@ -481,8 +482,7 @@ export const es = {
     hotkey: {
       empty: 'El atajo no puede estar vacío',
       invalid: 'Atajo no válido',
-      too_many_keys:
-        'Como máximo tres teclas (por ejemplo Cmd+Option+T)',
+      too_many_keys: 'Como máximo tres teclas (por ejemplo Cmd+Option+T)',
       conflict: 'Ese atajo ya está asignado a otra acción',
       register_failed:
         'No se pudo registrar el atajo. Puede estar en uso por el sistema u otra aplicación.',

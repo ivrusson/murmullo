@@ -333,6 +333,7 @@ export const en: Messages = {
     helpTitle: 'Help',
     helpBody:
       'Opens a GitHub issue. Nothing is sent on its own: you review the form and press Submit. If you do not have an account, copy the report.',
+    version: 'Version {version}',
     reportBug: 'Report a bug',
     requestFeature: 'Request a feature',
     bugTitle: 'Report a bug',
@@ -480,8 +481,7 @@ export const en: Messages = {
     hotkey: {
       empty: 'The shortcut cannot be empty',
       invalid: 'Invalid shortcut',
-      too_many_keys:
-        'Use at most three keys (for example Cmd+Option+T)',
+      too_many_keys: 'Use at most three keys (for example Cmd+Option+T)',
       conflict: 'That shortcut is already assigned to another action',
       register_failed:
         'Could not register the shortcut. It may be in use by the system or another app.',

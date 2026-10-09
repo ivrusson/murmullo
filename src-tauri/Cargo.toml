@@ -1,6 +1,6 @@
 [package]
 name = "murmullo"
-version = "0.7.0"
+version = "0.8.0"
 description = "Murmullo - Offline Voice Dictation"
 authors = ["Iván Subsierra"]
 edition = "2021"
