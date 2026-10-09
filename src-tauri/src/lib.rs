@@ -2,6 +2,7 @@ mod audio;
 mod codes;
 mod commands;
 mod config;
+mod correction;
 mod crash;
 mod dictionary;
 mod insertion;
@@ -11,27 +12,31 @@ mod paths;
 mod permissions;
 mod pipeline;
 mod postprocess;
+mod prompts;
 mod runtime;
 mod transcription;
 
 use audio::{AudioCapture, AudioProcessor};
 use commands::{
-    add_dictionary_entry, apply_correction, apply_registered_shortcut, cleanup_orphaned_files,
-    create_floating_bar_window, delete_transcription, download_audio_file, download_model,
-    ensure_floating_bar_window, ensure_stt_runtime, get_app_info, get_audio_file_path,
-    get_audio_level, get_config, get_download_progress, get_insertion_mode, get_model_info,
+    add_dictionary_entry, apply_correction, apply_registered_shortcut, cancel_browser_correction,
+    cleanup_orphaned_files, create_floating_bar_window, delete_transcription, download_audio_file,
+    download_model, ensure_floating_bar_window, ensure_stt_runtime, get_app_info,
+    get_audio_file_path, get_audio_level, get_config, get_correction_prompts,
+    get_correction_status, get_download_progress, get_insertion_mode, get_model_info,
     get_overlay_layout, get_pipeline_log_path, get_pipeline_logs, get_recordings_directory,
     get_runtime_status, get_selected_model, get_system_prompt, get_transcription, insert_text,
     is_model_downloaded, is_model_loaded, is_recording, list_audio_devices, list_dictionary,
     list_llm_providers, list_models, list_transcriptions, load_model, overlay_cancel_dictation,
-    overlay_start_dictation, overlay_stop_dictation, register_global_shortcut,
-    remove_dictionary_entry, resize_overlay, rewrite_with_configured_llm, save_overlay_position,
-    save_transcription, set_insertion_mode, set_overlay_compact, set_overlay_style,
-    set_transcription_language, show_main_window, start_llm_runtime, start_push_to_talk,
-    start_recording, start_stt_runtime, stop_push_to_talk, stop_recording, stop_stt_runtime,
-    transcribe_audio, unregister_global_shortcut, update_audio_config, update_hotkey_config,
-    update_runtime_config, update_selected_model, update_transcription, update_ui_language,
-    update_ui_theme, AppState,
+    overlay_start_dictation, overlay_stop_dictation, register_browser_corrector,
+    register_global_shortcut, remove_dictionary_entry, report_correction_status,
+    request_builtin_model_download, resize_overlay, rewrite_with_configured_llm,
+    save_overlay_position, save_transcription, set_correction_prompt, set_insertion_mode,
+    set_overlay_compact, set_overlay_style, set_transcription_language, show_main_window,
+    start_llm_runtime, start_push_to_talk, start_recording, start_stt_runtime, stop_push_to_talk,
+    stop_recording, stop_stt_runtime, submit_browser_correction, transcribe_audio,
+    unregister_browser_corrector, unregister_global_shortcut, update_audio_config,
+    update_hotkey_config, update_runtime_config, update_selected_model, update_transcription,
+    update_ui_language, update_ui_theme, AppState,
 };
 use config::AppConfig;
 use dictionary::DictionaryStore;
@@ -116,6 +121,7 @@ pub fn run() {
         config,
         transcription_persistence,
         transcription_database,
+        correction: crate::correction::CorrectionBridge::new(),
     };
 
     crate::crash::install_panic_hook();
@@ -221,6 +227,7 @@ pub fn run() {
             cleanup_orphaned_files,
             get_recordings_directory,
             insert_text,
+            set_correction_prompt,
             set_insertion_mode,
             get_insertion_mode,
             get_config,
@@ -253,6 +260,14 @@ pub fn run() {
             start_llm_runtime,
             list_llm_providers,
             rewrite_with_configured_llm,
+            register_browser_corrector,
+            unregister_browser_corrector,
+            submit_browser_correction,
+            get_correction_prompts,
+            get_correction_status,
+            report_correction_status,
+            cancel_browser_correction,
+            request_builtin_model_download,
             list_dictionary,
             add_dictionary_entry,
             remove_dictionary_entry,

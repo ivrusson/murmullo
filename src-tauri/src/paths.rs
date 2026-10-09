@@ -36,6 +36,10 @@ pub fn prompt_file() -> PathBuf {
     app_dir().join("prompt.md")
 }
 
+pub fn correction_prompts_file() -> PathBuf {
+    app_dir().join("correction-prompts.json")
+}
+
 pub fn models_dir() -> PathBuf {
     app_dir().join("models")
 }
@@ -207,6 +211,10 @@ mod tests {
         assert_eq!(recordings_dir(), root.join("recordings"));
         assert_eq!(dictionary_file(), root.join("dictionary.json"));
         assert_eq!(prompt_file(), root.join("prompt.md"));
+        assert_eq!(
+            correction_prompts_file(),
+            root.join("correction-prompts.json")
+        );
         assert_eq!(models_dir(), root.join("models"));
         assert_eq!(runtime_dir(), root.join("runtime").join("nemo-speech"));
         assert_eq!(log_file(), root.join("logs").join("murmullo.log"));

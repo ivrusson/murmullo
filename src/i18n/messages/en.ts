@@ -120,7 +120,7 @@ export const en: Messages = {
   },
   dictionary: {
     title: 'Dictionary',
-    lede: 'Deterministic replacements before the LLM. Each change regenerates the system prompt.',
+    lede: 'Deterministic replacements before the LLM. Each rule is added to the system prompt.',
     newRule: 'New rule',
     systemPrompt: 'System prompt',
     heardPlaceholder: 'as the STT heard it',
@@ -139,7 +139,7 @@ export const en: Messages = {
   },
   runtime: {
     title: 'Runtimes',
-    lede: 'First run: Murmullo downloads nemo-speech and Parakeet Q8, then starts STT on localhost. The LLM is optional (Ollama, Kimi, Kilo, Cursor or Claude); dictation works without it.',
+    lede: 'First run: Murmullo downloads nemo-speech and Parakeet Q8, then starts STT on localhost. Correction is optional: Murmullo’s model downloads in the app, or you can use Ollama, Kimi, Kilo, Cursor or Claude.',
     autoInstall: 'Automatic install',
     autoInstallBody:
       'One click downloads the official NVIDIA CLI (with SHA-256), the Parakeet Q8 model (~714 MB) and starts the STT server.',
@@ -171,6 +171,11 @@ export const en: Messages = {
     sttReady: 'STT ready',
     sttStopped: 'STT stopped',
     stepLlm: 'LLM {provider} (optional)',
+    stepMurmullo: 'Murmullo model (optional)',
+    murmulloBody:
+      'Qwen 2.5 0.5B, 480 MB. The download shows up here, with size and progress, the same way Parakeet does.',
+    correctionOff:
+      'Correction is off. Dictation uses the transcript and the dictionary.',
     llmServerBody:
       'Ollama is detected on PATH, Homebrew, /usr/local/bin and Ollama.app. Pick provider and model in Settings.',
     llmCliBody:
@@ -234,8 +239,33 @@ export const en: Messages = {
     noiseHint: 'Filters background before STT',
     normalize: 'Normalisation',
     normalizeHint: 'Evens out clip volume',
-    llmRewrite: 'AI rewrite',
-    rewrite: 'Rewrite with LLM',
+    llmRewrite: 'Correction',
+    rewrite: 'Correct the dictation',
+    rewriteOff: 'No model. Dictation uses the transcript and the dictionary.',
+    providerMurmullo: 'Murmullo',
+    murmulloHint:
+      'The model downloads inside the app. You see the name, the size and the progress.',
+    modelSize: '{size} MB',
+    modelDownload: 'Download',
+    modelRetry: 'Retry',
+    modelDownloaded: 'Downloaded',
+    modelDownloading: 'Downloading… {pct}%',
+    modelLoading: 'Preparing the model…',
+    modelMissing: 'Not downloaded',
+    modelError: 'The download failed. You can retry.',
+    promptTitle: 'System prompt',
+    promptEs: 'Español',
+    promptEn: 'English',
+    promptMurmulloBody:
+      'Murmullo’s model uses these instructions. If you change them, you can restore the original.',
+    promptProviderBody:
+      'The provider uses these instructions when correcting. The dictionary is added at the end. If you change them, you can restore the original.',
+    promptHint:
+      'This sentence is added on its own, following the dictation language.',
+    promptPreview: 'This is what gets sent',
+    promptRestore: 'Restore',
+    promptRestored: 'System prompt restored',
+    promptSaveFailed: 'Could not save the system prompt',
     provider: 'Provider',
     model: 'Model',
     chooseProvider: 'Choose provider',
@@ -491,6 +521,9 @@ export const en: Messages = {
       sendingStt: 'Sending audio…',
       preparingAudio: 'Preparing audio…',
       llmRewrite: 'Rewriting…',
+      browserDownloading: 'Downloading the corrector… {pct}%',
+      browserLoading: 'Loading the corrector…',
+      browserCorrecting: 'Correcting…',
       dictionary: 'Dictionary and punctuation…',
       processing: 'Processing…',
     },

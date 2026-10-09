@@ -53,12 +53,15 @@ export interface AppConfig {
   ui: UiConfig;
 }
 
+export type CorrectionMode = 'auto' | 'provider' | 'browser' | 'basic';
+
 export interface RuntimeConfig {
   stt_port: number;
   llm_url: string;
   llm_model: string;
   llm_provider?: string;
   llm_enabled: boolean;
+  correction_mode?: CorrectionMode;
   default_language?: string;
 }
 

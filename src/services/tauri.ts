@@ -159,13 +159,15 @@ export const configService = {
     llmEnabled: boolean,
     llmModel: string,
     defaultLanguage?: string,
-    llmProvider?: string
+    llmProvider?: string,
+    correctionMode?: string
   ): Promise<void> {
     return await invoke('update_runtime_config', {
       llmEnabled,
       llmProvider,
       llmModel,
       defaultLanguage,
+      correctionMode,
     });
   },
   async updateSelectedModel(modelName: string | null): Promise<void> {

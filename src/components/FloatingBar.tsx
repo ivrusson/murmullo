@@ -65,8 +65,8 @@ import {
   type HudTranscription,
   type MascotPlacement,
 } from './FloatingBarStates';
+import { improveDictation } from '@/correction/improve';
 import {
-  improvePrompt,
   rewriteWithConfiguredLlm,
   summarizePrompt,
   translatePrompt,
@@ -745,6 +745,32 @@ export const FloatingBar: React.FC = () => {
     [closeOverlays, transcription, t]
   );
 
+  const improveCurrent = useCallback(async () => {
+    const text = transcription?.text?.trim() ?? '';
+    if (!text) return;
+    closeOverlays();
+    localBusyRef.current = true;
+    setProcessingMessage('status.browserCorrecting');
+    setMode('processing');
+    try {
+      const next = await improveDictation(text);
+      if (next) {
+        setTranscription(current =>
+          current
+            ? { ...current, text: next }
+            : { text: next, duration_ms: 0, model_used: '' }
+        );
+      }
+      setMode('transcribed');
+      setNotice({
+        kind: 'insert',
+        message: next ? t('hud.textUpdated') : t('hud.rewriteFailed'),
+      });
+    } finally {
+      localBusyRef.current = false;
+    }
+  }, [closeOverlays, transcription, t]);
+
   const openHistory = useCallback(() => {
     closeOverlays();
     setHistoryQuery('');
@@ -1272,9 +1298,7 @@ export const FloatingBar: React.FC = () => {
               text={transcription?.text ?? ''}
               onInsert={() => void insertCurrent(transcription?.text ?? '')}
               onCopy={copyAndDismiss}
-              onImprove={() =>
-                void rewriteCurrent(improvePrompt(), t('hud.improvingShort'))
-              }
+              onImprove={() => void improveCurrent()}
               onSummarize={() =>
                 void rewriteCurrent(
                   summarizePrompt(),
@@ -1298,9 +1322,7 @@ export const FloatingBar: React.FC = () => {
               text={transcription?.text ?? ''}
               onInsert={() => void insertCurrent(transcription?.text ?? '')}
               onCopy={copyAndDismiss}
-              onImprove={() =>
-                void rewriteCurrent(improvePrompt(), t('hud.improvingShort'))
-              }
+              onImprove={() => void improveCurrent()}
               onClose={returnToIdle}
               showTimeout={!reducedMotion && !menuOpen && !modal}
             />
@@ -1406,9 +1428,7 @@ export const FloatingBar: React.FC = () => {
             text={transcription?.text ?? ''}
             menuOpen={menuOpen}
             onCopy={copyAndDismiss}
-            onImprove={() =>
-              void rewriteCurrent(improvePrompt(), t('hud.improvingShort'))
-            }
+            onImprove={() => void improveCurrent()}
             onToggleMenu={() => setMenuOpen(open => !open)}
             onClose={returnToIdle}
             showTimeout={!reducedMotion && !menuOpen && !modal}
