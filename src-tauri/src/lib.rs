@@ -30,13 +30,13 @@ use commands::{
     overlay_start_dictation, overlay_stop_dictation, register_browser_corrector,
     register_global_shortcut, remove_dictionary_entry, report_correction_status,
     request_builtin_model_download, resize_overlay, rewrite_with_configured_llm,
-    save_overlay_position, save_transcription, set_correction_prompt, set_insertion_mode,
-    set_overlay_compact, set_overlay_style, set_transcription_language, show_main_window,
-    start_llm_runtime, start_push_to_talk, start_recording, start_stt_runtime, stop_push_to_talk,
-    stop_recording, stop_stt_runtime, submit_browser_correction, transcribe_audio,
-    unregister_browser_corrector, unregister_global_shortcut, update_audio_config,
-    update_hotkey_config, update_runtime_config, update_selected_model, update_transcription,
-    update_ui_language, update_ui_theme, AppState,
+    save_overlay_position, save_transcription, set_auto_insert, set_correction_prompt,
+    set_insertion_mode, set_overlay_compact, set_overlay_style, set_transcription_language,
+    show_main_window, start_llm_runtime, start_push_to_talk, start_recording, start_stt_runtime,
+    stop_push_to_talk, stop_recording, stop_stt_runtime, submit_browser_correction,
+    transcribe_audio, unregister_browser_corrector, unregister_global_shortcut,
+    update_audio_config, update_hotkey_config, update_runtime_config, update_selected_model,
+    update_transcription, update_ui_language, update_ui_theme, AppState,
 };
 use config::AppConfig;
 use dictionary::DictionaryStore;
@@ -227,6 +227,7 @@ pub fn run() {
             cleanup_orphaned_files,
             get_recordings_directory,
             insert_text,
+            set_auto_insert,
             set_correction_prompt,
             set_insertion_mode,
             get_insertion_mode,

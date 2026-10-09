@@ -9,14 +9,21 @@
   "github": {
     "release": true,
     "releaseName": "Release v${version}",
-    "releaseNotes": "See CHANGELOG.md for details"
+    "releaseNotes": "echo 'See CHANGELOG.md for details'"
   },
   "npm": {
     "publish": false
   },
   "plugins": {
     "@release-it/bumper": {
-      "in": ["package.json", "src-tauri/Cargo.toml", "src-tauri/tauri.conf.json"]
+      "in": "package.json",
+      "out": [
+        {
+          "file": "src-tauri/Cargo.toml",
+          "path": "package.version"
+        },
+        "src-tauri/tauri.conf.json"
+      ]
     }
   },
   "hooks": {

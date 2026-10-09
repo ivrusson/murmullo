@@ -1,7 +1,7 @@
 {
   "name": "murmullo",
   "private": true,
-  "version": "0.8.0",
+  "version": "0.8.2",
   "type": "module",
   "description": "Offline voice dictation for macOS — local STT with nemo-speech and Parakeet",
   "author": "Iván Subsierra",

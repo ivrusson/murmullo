@@ -65,7 +65,7 @@ type MascotProps = {
   placement: MascotPlacement;
   sceneMode: MurmulloSceneMode;
   level?: number;
-  onPointerDown?: PointerEventHandler<HTMLDivElement>;
+  onMouseDown?: MouseEventHandler<HTMLDivElement>;
   onPointerEnter?: PointerEventHandler<HTMLDivElement>;
   onPointerLeave?: PointerEventHandler<HTMLDivElement>;
   onContextMenu?: MouseEventHandler<HTMLDivElement>;
@@ -75,7 +75,7 @@ export function HudMascot({
   placement,
   sceneMode,
   level,
-  onPointerDown,
+  onMouseDown,
   onPointerEnter,
   onPointerLeave,
   onContextMenu,
@@ -90,7 +90,7 @@ export function HudMascot({
     <div
       className={className}
       data-hud-hit=""
-      onPointerDown={onPointerDown}
+      onMouseDown={onMouseDown}
       onPointerEnter={onPointerEnter}
       onPointerLeave={onPointerLeave}
       onContextMenu={onContextMenu}
@@ -114,7 +114,7 @@ export function HudStage({
   mode,
   width,
   mascot,
-  onPointerDown,
+  onMouseDown,
   onPointerEnter,
   onPointerLeave,
   children,
@@ -123,7 +123,7 @@ export function HudStage({
   mode: HudMode;
   width: number;
   mascot: ReactNode;
-  onPointerDown?: PointerEventHandler<HTMLDivElement>;
+  onMouseDown?: MouseEventHandler<HTMLDivElement>;
   onPointerEnter?: PointerEventHandler<HTMLDivElement>;
   onPointerLeave?: PointerEventHandler<HTMLDivElement>;
   children: ReactNode;
@@ -131,7 +131,7 @@ export function HudStage({
   const rest = mode === 'rest';
   const chromeProps = {
     'data-hud-hit': '',
-    onPointerDown,
+    onMouseDown,
     onPointerEnter,
     onPointerLeave,
   };

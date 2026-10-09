@@ -25,12 +25,18 @@ tray and the overlay.
 5. Hold **`⌘ ⌥ T`** (default), speak, release. Corrected text is pasted at the caret. Raw STT and
    the final line land in **History**.
 
-The overlay HUD shows idle / recording / processing / done / error, plus Record / Stop / Cancel. The
-system shortcut is the primary trigger so Murmullo never has to steal focus.
+The overlay HUD shows idle / recording / processing / done / error, plus Record / Stop / Cancel.
+Drag the pill or the mascot to move the bar. Clicks on the empty margin pass through to the app
+underneath. The system shortcut is the primary trigger so Murmullo never has to steal focus.
 
-Optional: install [Ollama](https://ollama.com) (or another provider below) if you want an LLM
-rewrite on top of the dictionary. Dictation already works with STT + dictionary when the LLM is
-down.
+Correction can run on the machine. In **Settings**, download the built-in corrector (Qwen 2.5 0.5B,
+~480 MB). Spanish and English system prompts are editable, and each one can be restored to the
+default. [Ollama](https://ollama.com) and the other providers below stay optional. Dictation already
+works with STT + dictionary when no corrector is ready.
+
+Finished text pastes once into the focused app when **auto-insert** is on (the default, including
+configs saved before the toggle existed). Turn it off from the overlay menu if you would rather
+press Insert.
 
 ## How dictation works
 
@@ -92,16 +98,18 @@ After the dictionary pass, Murmullo may send the text to a local provider. The L
 content**; the baked-in prompt asks it to keep the original language, apply dictionary terms, fix
 punctuation, and drop filler words only when the meaning stays the same.
 
-Turn rewrite on or off in **Settings → AI rewrite**. Default provider is **Ollama** at
-`http://127.0.0.1:11434`, model `llama3.2`.
+Turn rewrite on or off in **Settings → AI rewrite**. The on-device path is **Murmullo** (Qwen 2.5
+0.5B, downloaded in the app). **Ollama** remains available at `http://127.0.0.1:11434`, model
+`llama3.2`.
 
-| Provider | Kind   | Default model | Notes                                                                                                                             |
-| -------- | ------ | ------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| Ollama   | Server | `llama3.2`    | Detected on PATH, Homebrew, `/usr/local/bin`, `Ollama.app`. Pull the model (`ollama pull llama3.2`) or pick one you already have. |
-| Kimi     | CLI    | `kimi-k2.5`   | `kimi -p` rewrites the take.                                                                                                      |
-| Kilo     | CLI    | `auto`        | `kilo` (or `kili`) `run`.                                                                                                         |
-| Cursor   | CLI    | `auto`        | `agent` / `cursor-agent` in ask mode — it must not edit files.                                                                    |
-| Claude   | CLI    | `sonnet`      | `claude -p` (`sonnet`, `opus`, `haiku`, …).                                                                                       |
+| Provider | Kind      | Default model | Notes                                                                                                                             |
+| -------- | --------- | ------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| Murmullo | On device | Qwen 2.5 0.5B | ~480 MB. Progress shows in Settings, the same way Parakeet does. No separate server.                                              |
+| Ollama   | Server    | `llama3.2`    | Detected on PATH, Homebrew, `/usr/local/bin`, `Ollama.app`. Pull the model (`ollama pull llama3.2`) or pick one you already have. |
+| Kimi     | CLI       | `kimi-k2.5`   | `kimi -p` rewrites the take.                                                                                                      |
+| Kilo     | CLI       | `auto`        | `kilo` (or `kili`) `run`.                                                                                                         |
+| Cursor   | CLI       | `auto`        | `agent` / `cursor-agent` in ask mode — it must not edit files.                                                                    |
+| Claude   | CLI       | `sonnet`      | `claude -p` (`sonnet`, `opus`, `haiku`, …).                                                                                       |
 
 Runtimes shows whether the backend and the configured model are actually there. If the CLI is
 missing, switch provider in Settings — dictation does not wait on it.
@@ -127,8 +135,8 @@ not in Slack, Input Monitoring is still off for this binary.
 ### Shortcut
 
 **Settings → Global shortcuts.** Default hold-to-talk is `Cmd+Option+T`. Click the field and press
-one to three keys (a single key, or a chord such as `Cmd+T` / `Cmd+Option+T`). Esc cancels.
-Reserved chords (`Cmd+Space`, `Cmd+Tab`, `Cmd+Q`, …) are rejected.
+one to three keys (a single key, or a chord such as `Cmd+T` / `Cmd+Option+T`). Esc cancels. Reserved
+chords (`Cmd+Space`, `Cmd+Tab`, `Cmd+Q`, …) are rejected.
 
 ### Microphone and audio
 
@@ -143,7 +151,7 @@ language.
 **Settings → AI rewrite:**
 
 1. Enable or disable rewrite.
-2. Choose provider (Ollama, Kimi, Kilo, Cursor, Claude).
+2. Choose provider (Murmullo on-device, Ollama, Kimi, Kilo, Cursor, Claude).
 3. Choose a model from the list Murmullo detected. If the list is empty, the backend is not
    installed or has no models pulled yet.
 

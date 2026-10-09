@@ -84,6 +84,7 @@ export interface UiConfig {
   overlay_y?: number | null;
   overlay_compact?: boolean;
   overlay_style?: OverlayStyle;
+  auto_insert?: boolean;
 }
 
 export interface HotkeyConfig {

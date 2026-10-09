@@ -9,6 +9,28 @@ Murmullo is still **beta**. Versions stay on the `0.x` line until the product is
 
 ## [Unreleased]
 
+## [0.8.2] - 2026-10-09
+
+### Fixed
+
+- Settings and crash reports show the same version as the release. 0.8.1 still reported 0.8.0.
+
+## [0.8.1] - 2026-10-09
+
+### Fixed
+
+- The floating bar accepts clicks and can be dragged again. Text on the pill and the mascot still
+  does not stay highlighted. Empty padding around the bar passes through to the desktop.
+- macOS paste sends Cmd+V once and brings the target app's window forward, so the caret receives the
+  line.
+- Auto-insert stays on for configs saved before the toggle, and turning it off no longer pastes the
+  same dictation twice.
+
+### Changed
+
+- README and the usage guide describe the on-device Qwen corrector. Home in the README is a current
+  capture, with the companion from the in-app hero.
+
 ## [0.8.0] - 2026-10-09
 
 On-device dictation correction, flexible push-to-talk chords, and easier source installs.

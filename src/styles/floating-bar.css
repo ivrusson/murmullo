@@ -78,11 +78,27 @@ body {
   user-select: text;
 }
 
+.floating-bar-container ::selection {
+  background: transparent;
+}
+
+.floating-bar-container textarea::selection,
+.floating-bar-container
+  input:not([type='button']):not([type='submit']):not(
+    [type='reset']
+  )::selection,
+.hud-modal textarea::selection,
+.hud-card-search input::selection {
+  background: Highlight;
+  color: HighlightText;
+}
+
+/* Icons and the mascot graphic must not steal the click or start an image drag. */
 .floating-bar-container img,
 .floating-bar-container svg,
 .floating-bar-container canvas {
   -webkit-user-drag: none;
-  user-drag: none;
+  pointer-events: none;
   -webkit-user-select: none;
   user-select: none;
 }
