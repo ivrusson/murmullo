@@ -42,7 +42,7 @@ export default defineConfig({
   optimizeDeps: {
     // Avoid a StyleX/Vite crawl deadlock that never commits `.vite/deps`.
     holdUntilCrawlEnd: false,
-    exclude: ['@tauri-apps/api'],
+    exclude: ['@tauri-apps/api', '@huggingface/transformers'],
   },
   build: {
     rollupOptions: {

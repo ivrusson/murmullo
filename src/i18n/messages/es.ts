@@ -118,7 +118,7 @@ export const es = {
   },
   dictionary: {
     title: 'Diccionario',
-    lede: 'Reemplazos deterministas antes del LLM. Cada cambio regenera el system prompt.',
+    lede: 'Reemplazos deterministas antes del LLM. Cada regla se añade al system prompt.',
     newRule: 'Nueva regla',
     systemPrompt: 'System prompt',
     heardPlaceholder: 'como lo oye el STT',
@@ -137,7 +137,7 @@ export const es = {
   },
   runtime: {
     title: 'Runtimes',
-    lede: 'Primera ejecución: Murmullo descarga nemo-speech y Parakeet Q8, luego arranca el STT en localhost. El LLM es opcional (Ollama, Kimi, Kilo, Cursor o Claude); el dictado funciona sin él.',
+    lede: 'Primera ejecución: Murmullo descarga nemo-speech y Parakeet Q8, luego arranca el STT en localhost. La corrección es opcional: el modelo de Murmullo se descarga en la app, o puedes usar Ollama, Kimi, Kilo, Cursor o Claude.',
     autoInstall: 'Instalación automática',
     autoInstallBody:
       'Un clic descarga el CLI oficial de NVIDIA (con SHA-256), el modelo Parakeet Q8 (~714 MB) y arranca el servidor STT.',
@@ -169,6 +169,11 @@ export const es = {
     sttReady: 'STT listo',
     sttStopped: 'STT parado',
     stepLlm: 'LLM {provider} (opcional)',
+    stepMurmullo: 'Modelo de Murmullo (opcional)',
+    murmulloBody:
+      'Qwen 2.5 0.5B, 480 MB. La descarga se ve aquí, con el tamaño y el progreso, igual que Parakeet.',
+    correctionOff:
+      'La corrección está desactivada. El dictado usa el texto y el diccionario.',
     llmServerBody:
       'Se detecta Ollama en PATH, Homebrew, /usr/local/bin y Ollama.app. Elige proveedor y modelo en Ajustes.',
     llmCliBody:
@@ -233,8 +238,32 @@ export const es = {
     noiseHint: 'Filtra el fondo antes del STT',
     normalize: 'Normalización',
     normalizeHint: 'Nivela el volumen del clip',
-    llmRewrite: 'Reformulación IA',
-    rewrite: 'Reescribir con LLM',
+    llmRewrite: 'Corrección',
+    rewrite: 'Corregir el dictado',
+    rewriteOff: 'Sin modelo. El dictado usa el texto y el diccionario.',
+    providerMurmullo: 'Murmullo',
+    murmulloHint:
+      'El modelo se descarga en la app. Ves el nombre, el tamaño y el progreso.',
+    modelSize: '{size} MB',
+    modelDownload: 'Descargar',
+    modelRetry: 'Reintentar',
+    modelDownloaded: 'Descargado',
+    modelDownloading: 'Descargando… {pct}%',
+    modelLoading: 'Preparando el modelo…',
+    modelMissing: 'Sin descargar',
+    modelError: 'No se pudo descargar. Puedes reintentar.',
+    promptTitle: 'System prompt',
+    promptEs: 'Español',
+    promptEn: 'English',
+    promptMurmulloBody:
+      'El modelo de Murmullo usa estas instrucciones. Si las cambias, puedes restaurar el original.',
+    promptProviderBody:
+      'El proveedor usa estas instrucciones al corregir. El diccionario se añade al final. Si las cambias, puedes restaurar el original.',
+    promptHint: 'Esta frase se añade sola, según el idioma del dictado.',
+    promptPreview: 'Así se envía',
+    promptRestore: 'Restaurar',
+    promptRestored: 'System prompt restaurado',
+    promptSaveFailed: 'No se pudo guardar el system prompt',
     provider: 'Proveedor',
     model: 'Modelo',
     chooseProvider: 'Elige proveedor',
@@ -493,6 +522,9 @@ export const es = {
       sendingStt: 'Enviando audio…',
       preparingAudio: 'Preparando audio…',
       llmRewrite: 'Reescribiendo…',
+      browserDownloading: 'Descargando el corrector… {pct}%',
+      browserLoading: 'Cargando el corrector…',
+      browserCorrecting: 'Corrigiendo…',
       dictionary: 'Diccionario y puntuación…',
       processing: 'Procesando…',
     },

@@ -14,6 +14,9 @@ import { Button } from '@/components/ui-system/Button';
 import { Chip } from '@/components/ui-system/Chip';
 import { color, font, radius, space } from '@/styles/tokens.stylex';
 import { sx } from '@/components/ui-system/sx';
+import { BuiltinModelCard } from '@/correction/BuiltinModelCard';
+import { usesBuiltinCorrector } from '@/correction/types';
+import { useCorrectionStatus } from '@/correction/useCorrectionStatus';
 import { useT, mapBackendError, translateBackendMessage } from '@/i18n';
 
 const styles = stylex.create({
@@ -152,8 +155,10 @@ function Step({
   );
 }
 
-function providerLabel(id: string): string {
+function providerLabel(id: string, murmullo: string): string {
   switch (id) {
+    case 'murmullo':
+      return murmullo;
     case 'kimi':
       return 'Kimi';
     case 'kilo':
@@ -163,14 +168,19 @@ function providerLabel(id: string): string {
       return 'Cursor';
     case 'claude':
       return 'Claude';
-    default:
+    case 'ollama':
       return 'Ollama';
+    default:
+      return id;
   }
 }
 
 export function RuntimePage() {
   const t = useT();
   const { runtimeStatus: status, refreshRuntime, config } = useAppConfig();
+  const correction = useCorrectionStatus();
+  const builtin = usesBuiltinCorrector(config?.runtime);
+  const correctionOn = config?.runtime.llm_enabled !== false;
   const ptt = formatHotkey(config?.hotkeys.push_to_talk);
   const [busy, setBusy] = useState<string | null>(null);
   const [micOk, setMicOk] = useState(false);
@@ -241,7 +251,10 @@ export function RuntimePage() {
   const llmStopped = status?.llm_server.state === 'stopped';
   const llmIsServer = (status?.llm_kind ?? 'server') === 'server';
   const llmProviderLabel = providerLabel(
-    status?.llm_provider ?? config?.runtime.llm_provider ?? 'ollama'
+    builtin
+      ? 'murmullo'
+      : (status?.llm_provider ?? config?.runtime.llm_provider ?? 'ollama'),
+    t('settings.providerMurmullo')
   );
   const cliBusy =
     status?.stt_binary.state === 'downloading' ||
@@ -375,62 +388,90 @@ export function RuntimePage() {
 
         <Step
           n={5}
-          title={t('runtime.stepLlm', { provider: llmProviderLabel })}
-          done={!!llmReady}
+          title={
+            !correctionOn
+              ? t('settings.llmRewrite')
+              : builtin
+                ? t('runtime.stepMurmullo')
+                : t('runtime.stepLlm', { provider: llmProviderLabel })
+          }
+          done={
+            correctionOn &&
+            (builtin
+              ? correction.state === 'ready' ||
+                correction.state === 'processing'
+              : !!llmReady)
+          }
         >
-          <p {...sx(styles.copy)}>
-            {llmIsServer
-              ? t('runtime.llmServerBody')
-              : t('runtime.llmCliBody', { provider: llmProviderLabel })}
-          </p>
-          {status ? (
+          {!correctionOn ? (
+            <p {...sx(styles.copy)}>{t('runtime.correctionOff')}</p>
+          ) : builtin ? (
             <>
-              <StatusRow
-                label={
-                  llmIsServer
-                    ? t('runtime.ollamaCli')
-                    : t('runtime.cliProvider', { provider: llmProviderLabel })
-                }
-                status={status.llm_binary}
-              />
-              <StatusRow
-                label={
-                  llmIsServer ? t('runtime.llmServer') : t('runtime.llmBackend')
-                }
-                status={status.llm_server}
-              />
-              <StatusRow
-                label={t('runtime.llmModel')}
-                status={
-                  status.llm_model_status ?? {
-                    state: 'missing',
-                    message: t('runtime.noData'),
-                    progress: null,
-                  }
-                }
-              />
+              <p {...sx(styles.copy)}>{t('runtime.murmulloBody')}</p>
+              <BuiltinModelCard />
             </>
-          ) : null}
-          {llmStopped && llmIsServer ? (
-            <Button
-              disabled={busy !== null}
-              onClick={() =>
-                void run(t('runtime.llmStarted'), () =>
-                  runtimeService.startLlm()
-                )
-              }
-            >
-              <Play size={14} strokeWidth={1.5} /> {t('runtime.startOllama')}
-            </Button>
-          ) : null}
-          {!llmInstalled && !llmReady ? (
-            <p {...sx(styles.copy)}>
-              {t('runtime.llmMissing', { provider: llmProviderLabel })}
-            </p>
-          ) : null}
-          {llmReady && status?.llm_model_status?.state !== 'ready' ? (
-            <p {...sx(styles.copy)}>{t('runtime.llmModelMissing')}</p>
-          ) : null}
+          ) : (
+            <>
+              <p {...sx(styles.copy)}>
+                {llmIsServer
+                  ? t('runtime.llmServerBody')
+                  : t('runtime.llmCliBody', { provider: llmProviderLabel })}
+              </p>
+              {status ? (
+                <>
+                  <StatusRow
+                    label={
+                      llmIsServer
+                        ? t('runtime.ollamaCli')
+                        : t('runtime.cliProvider', {
+                            provider: llmProviderLabel,
+                          })
+                    }
+                    status={status.llm_binary}
+                  />
+                  <StatusRow
+                    label={
+                      llmIsServer
+                        ? t('runtime.llmServer')
+                        : t('runtime.llmBackend')
+                    }
+                    status={status.llm_server}
+                  />
+                  <StatusRow
+                    label={t('runtime.llmModel')}
+                    status={
+                      status.llm_model_status ?? {
+                        state: 'missing',
+                        message: t('runtime.noData'),
+                        progress: null,
+                      }
+                    }
+                  />
+                </>
+              ) : null}
+              {llmStopped && llmIsServer ? (
+                <Button
+                  disabled={busy !== null}
+                  onClick={() =>
+                    void run(t('runtime.llmStarted'), () =>
+                      runtimeService.startLlm()
+                    )
+                  }
+                >
+                  <Play size={14} strokeWidth={1.5} />{' '}
+                  {t('runtime.startOllama')}
+                </Button>
+              ) : null}
+              {!llmInstalled && !llmReady ? (
+                <p {...sx(styles.copy)}>
+                  {t('runtime.llmMissing', { provider: llmProviderLabel })}
+                </p>
+              ) : null}
+              {llmReady && status?.llm_model_status?.state !== 'ready' ? (
+                <p {...sx(styles.copy)}>{t('runtime.llmModelMissing')}</p>
+              ) : null}
+            </>
+          )}
         </Step>
 
         {status?.dictation_ready ? (

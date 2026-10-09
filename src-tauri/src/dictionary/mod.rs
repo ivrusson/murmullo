@@ -19,16 +19,6 @@ struct DictionaryFile {
     entries: Vec<DictionaryEntry>,
 }
 
-const PROMPT_HEADER: &str = r#"Eres el corrector de dictado de Murmullo.
-Reglas:
-- No inventes contenido que no esté en el texto.
-- Conserva el idioma original.
-- Aplica el diccionario del usuario (nombres, marcas, jerga).
-- Corrige puntuación y mayúsculas si faltan.
-- Quita muletillas evidentes (eh, o sea, este) solo si no cambian el sentido.
-- Devuelve únicamente el texto final, sin comillas ni explicación.
-"#;
-
 pub struct DictionaryStore {
     path: PathBuf,
     prompt_path: PathBuf,
@@ -130,13 +120,20 @@ impl DictionaryStore {
         }
     }
 
+    pub fn refresh_prompt(&self) -> Result<(), Box<dyn std::error::Error>> {
+        self.regenerate_prompt(&self.load_file())
+    }
+
     fn regenerate_prompt(&self, file: &DictionaryFile) -> Result<(), Box<dyn std::error::Error>> {
         fs::write(&self.prompt_path, self.build_prompt(file))?;
         Ok(())
     }
 
     fn build_prompt(&self, file: &DictionaryFile) -> String {
-        let mut out = String::from(PROMPT_HEADER);
+        let mut out = crate::prompts::provider_header();
+        if !out.ends_with('\n') {
+            out.push('\n');
+        }
         out.push_str("\n## Diccionario\n");
         if file.entries.is_empty() {
             out.push_str("(vacío)\n");

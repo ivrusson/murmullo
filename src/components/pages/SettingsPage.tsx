@@ -1,6 +1,14 @@
 import { useState, useEffect } from 'react';
 import { toast } from '@/components/ui-system/toast';
 import * as stylex from '@stylexjs/stylex';
+import { BuiltinModelCard } from '@/correction/BuiltinModelCard';
+import { CorrectionPromptEditor } from '@/correction/CorrectionPromptEditor';
+import {
+  BROWSER_MODEL_ID,
+  BROWSER_MODEL_LABEL,
+  BUILTIN_PROVIDER_ID,
+  usesBuiltinCorrector,
+} from '@/correction/types';
 import { configService, runtimeService } from '@/services/tauri';
 import { GlobalSelectors } from '@/components/GlobalSelectors';
 import { HotkeyRecorder } from '@/components/HotkeyRecorder';
@@ -31,6 +39,9 @@ const styles = stylex.create({
     },
     gap: space.md,
     alignItems: 'start',
+  },
+  promptSpan: {
+    gridColumn: '1 / -1',
   },
   kicker: {
     margin: 0,
@@ -141,9 +152,14 @@ export function SettingsPage() {
         ),
         configService.updateRuntimeConfig(
           config.runtime.llm_enabled,
-          config.runtime.llm_model,
+          usesBuiltinCorrector(config.runtime)
+            ? BROWSER_MODEL_ID
+            : config.runtime.llm_model,
           config.runtime.default_language,
-          config.runtime.llm_provider || 'ollama'
+          usesBuiltinCorrector(config.runtime)
+            ? BUILTIN_PROVIDER_ID
+            : config.runtime.llm_provider || 'ollama',
+          usesBuiltinCorrector(config.runtime) ? 'browser' : 'provider'
         ),
         configService.updateHotkeyConfig(
           config.hotkeys.push_to_talk,
@@ -260,7 +276,11 @@ export function SettingsPage() {
             <p {...sx(styles.kicker)}>{t('settings.llmRewrite')}</p>
             <Toggle
               label={t('settings.rewrite')}
-              description={llmDescription(config.runtime, providers, t)}
+              description={
+                config.runtime.llm_enabled
+                  ? llmDescription(config.runtime, providers, t)
+                  : t('settings.rewriteOff')
+              }
               checked={config.runtime.llm_enabled}
               onChange={checked => {
                 setConfig({
@@ -270,72 +290,93 @@ export function SettingsPage() {
                 setHasChanges(true);
               }}
             />
-            <div {...sx(styles.field)}>
-              <p {...sx(styles.fieldLabel)}>{t('settings.provider')}</p>
-              <Select
-                value={config.runtime.llm_provider || 'ollama'}
-                onValueChange={value => {
-                  const next = providers.find(item => item.id === value);
-                  const keepModel =
-                    next?.models.includes(config.runtime.llm_model) ?? false;
-                  setConfig({
-                    ...config,
-                    runtime: {
-                      ...config.runtime,
-                      llm_provider: value,
-                      llm_model: keepModel
-                        ? config.runtime.llm_model
-                        : (next?.default_model ?? config.runtime.llm_model),
-                    },
-                  });
-                  setHasChanges(true);
-                }}
-                items={(providers.length > 0
-                  ? providers
-                  : [
-                      {
-                        id: 'ollama',
-                        label: 'Ollama',
-                        installed: true,
-                      },
-                      { id: 'kimi', label: 'Kimi', installed: false },
-                      { id: 'kilo', label: 'Kilo', installed: false },
-                      { id: 'cursor', label: 'Cursor', installed: false },
-                      { id: 'claude', label: 'Claude', installed: false },
-                    ]
-                ).map(item => ({
-                  value: item.id,
-                  label: item.installed
-                    ? item.label
-                    : t('settings.notInstalled', { label: item.label }),
-                }))}
-                placeholder={t('settings.chooseProvider')}
-              />
-            </div>
-            <div {...sx(styles.field)}>
-              <p {...sx(styles.fieldLabel)}>{t('settings.model')}</p>
-              <ComboBox
-                value={config.runtime.llm_model}
-                onValueChange={value => {
-                  if (!value) return;
-                  setConfig({
-                    ...config,
-                    runtime: { ...config.runtime, llm_model: value },
-                  });
-                  setHasChanges(true);
-                }}
-                options={modelOptions(config, providers)}
-                placeholder={t('settings.chooseModel')}
-                searchPlaceholder={t('settings.searchModel')}
-                emptyText={t('settings.noModels')}
-              />
-            </div>
-            {selectedProvider(config, providers)?.hint ? (
-              <p {...sx(styles.copy)}>
-                {selectedProvider(config, providers)?.hint}
-              </p>
+            {config.runtime.llm_enabled ? (
+              <>
+                <div {...sx(styles.field)}>
+                  <p {...sx(styles.fieldLabel)}>{t('settings.provider')}</p>
+                  <Select
+                    value={
+                      usesBuiltinCorrector(config.runtime)
+                        ? BUILTIN_PROVIDER_ID
+                        : config.runtime.llm_provider || 'ollama'
+                    }
+                    onValueChange={value => {
+                      if (value === BUILTIN_PROVIDER_ID) {
+                        setConfig({
+                          ...config,
+                          runtime: {
+                            ...config.runtime,
+                            llm_provider: BUILTIN_PROVIDER_ID,
+                            llm_model: BROWSER_MODEL_ID,
+                            correction_mode: 'browser',
+                          },
+                        });
+                        setHasChanges(true);
+                        return;
+                      }
+                      const next = providers.find(item => item.id === value);
+                      const keepModel =
+                        next?.models.includes(config.runtime.llm_model) ??
+                        false;
+                      setConfig({
+                        ...config,
+                        runtime: {
+                          ...config.runtime,
+                          llm_provider: value,
+                          llm_model: keepModel
+                            ? config.runtime.llm_model
+                            : (next?.default_model ?? config.runtime.llm_model),
+                          correction_mode: 'provider',
+                        },
+                      });
+                      setHasChanges(true);
+                    }}
+                    items={providerItems(providers, t)}
+                    placeholder={t('settings.chooseProvider')}
+                  />
+                </div>
+                {usesBuiltinCorrector(config.runtime) ? (
+                  <>
+                    <p {...sx(styles.copy)}>{t('settings.murmulloHint')}</p>
+                    <BuiltinModelCard />
+                  </>
+                ) : (
+                  <div {...sx(styles.field)}>
+                    <p {...sx(styles.fieldLabel)}>{t('settings.model')}</p>
+                    <ComboBox
+                      value={config.runtime.llm_model}
+                      onValueChange={value => {
+                        if (!value) return;
+                        setConfig({
+                          ...config,
+                          runtime: { ...config.runtime, llm_model: value },
+                        });
+                        setHasChanges(true);
+                      }}
+                      options={modelOptions(config, providers)}
+                      placeholder={t('settings.chooseModel')}
+                      searchPlaceholder={t('settings.searchModel')}
+                      emptyText={t('settings.noModels')}
+                    />
+                    {selectedProvider(config, providers)?.hint ? (
+                      <p {...sx(styles.copy)}>
+                        {selectedProvider(config, providers)?.hint}
+                      </p>
+                    ) : null}
+                  </div>
+                )}
+              </>
             ) : null}
           </Surface>
+          {config.runtime.llm_enabled ? (
+            <div {...sx(styles.promptSpan)}>
+              <Surface>
+                <CorrectionPromptEditor
+                  builtin={usesBuiltinCorrector(config.runtime)}
+                />
+              </Surface>
+            </div>
+          ) : null}
         </div>
       )}
       <HelpCard />
@@ -377,10 +418,41 @@ function HelpCard() {
   );
 }
 
+function providerItems(
+  providers: LlmProviderInfo[],
+  t: (
+    key: import('@/i18n').AppMessageKey,
+    params?: import('@/i18n').TranslateParams
+  ) => string
+) {
+  const external =
+    providers.length > 0
+      ? providers
+      : [
+          { id: 'ollama', label: 'Ollama', installed: true },
+          { id: 'kimi', label: 'Kimi', installed: false },
+          { id: 'kilo', label: 'Kilo', installed: false },
+          { id: 'cursor', label: 'Cursor', installed: false },
+          { id: 'claude', label: 'Claude', installed: false },
+        ];
+  return [
+    { value: BUILTIN_PROVIDER_ID, label: t('settings.providerMurmullo') },
+    ...external
+      .filter(item => item.id !== BUILTIN_PROVIDER_ID)
+      .map(item => ({
+        value: item.id,
+        label: item.installed
+          ? item.label
+          : t('settings.notInstalled', { label: item.label }),
+      })),
+  ];
+}
+
 function selectedProvider(
   config: AppConfig,
   providers: LlmProviderInfo[]
 ): LlmProviderInfo | undefined {
+  if (usesBuiltinCorrector(config.runtime)) return undefined;
   const id = config.runtime.llm_provider || 'ollama';
   return providers.find(item => item.id === id);
 }
@@ -388,7 +460,10 @@ function selectedProvider(
 function modelOptions(config: AppConfig, providers: LlmProviderInfo[]) {
   const provider = selectedProvider(config, providers);
   const models = new Set(provider?.models ?? []);
-  if (config.runtime.llm_model) {
+  if (
+    config.runtime.llm_model &&
+    (models.size === 0 || models.has(config.runtime.llm_model))
+  ) {
     models.add(config.runtime.llm_model);
   }
   return Array.from(models).map(value => ({ value, label: value }));
@@ -402,6 +477,12 @@ function llmDescription(
     params?: import('@/i18n').TranslateParams
   ) => string
 ): string {
+  if (usesBuiltinCorrector(runtime)) {
+    return t('settings.llmDesc', {
+      model: BROWSER_MODEL_LABEL,
+      provider: t('settings.providerMurmullo'),
+    });
+  }
   const provider =
     providers.find(item => item.id === (runtime.llm_provider || 'ollama'))
       ?.label ??

@@ -25,6 +25,8 @@ pub struct RuntimeConfig {
     pub llm_provider: String,
     #[serde(default = "default_true")]
     pub llm_enabled: bool,
+    #[serde(default = "default_correction_mode")]
+    pub correction_mode: String,
     pub default_language: Option<String>,
 }
 
@@ -40,8 +42,18 @@ fn default_llm_model() -> String {
 fn default_llm_provider() -> String {
     "ollama".to_string()
 }
+fn default_correction_mode() -> String {
+    "auto".to_string()
+}
 fn default_true() -> bool {
     true
+}
+
+pub fn normalize_correction_mode(value: &str) -> String {
+    match value.trim() {
+        "auto" | "provider" | "browser" | "basic" => value.trim().to_string(),
+        _ => default_correction_mode(),
+    }
 }
 
 impl Default for RuntimeConfig {
@@ -52,6 +64,7 @@ impl Default for RuntimeConfig {
             llm_model: default_llm_model(),
             llm_provider: default_llm_provider(),
             llm_enabled: true,
+            correction_mode: default_correction_mode(),
             default_language: None,
         }
     }
@@ -238,6 +251,7 @@ impl AppConfig {
         llm_provider: String,
         llm_model: String,
         default_language: Option<String>,
+        correction_mode: Option<String>,
     ) {
         self.runtime.llm_enabled = llm_enabled;
         self.runtime.llm_provider = crate::llm::normalize_provider(&llm_provider);
@@ -247,6 +261,9 @@ impl AppConfig {
             llm_model
         };
         self.runtime.default_language = default_language;
+        if let Some(mode) = correction_mode {
+            self.runtime.correction_mode = normalize_correction_mode(&mode);
+        }
     }
 
     pub fn update_hotkey_config(&mut self, push_to_talk: String, enabled: Option<bool>) {

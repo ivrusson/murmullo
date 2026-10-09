@@ -29,6 +29,7 @@ pub struct AppState {
     pub config: Arc<Mutex<AppConfig>>,
     pub transcription_persistence: Arc<Mutex<TranscriptionPersistence>>,
     pub transcription_database: Arc<Mutex<TranscriptionDatabase>>,
+    pub correction: crate::correction::CorrectionBridge,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -397,6 +398,7 @@ pub fn overlay_stop_dictation(app: tauri::AppHandle) {
 pub fn overlay_cancel_dictation(app: tauri::AppHandle) {
     crate::pipeline::log("ptt", "overlay: cancel");
     PTT_HELD.store(false, Ordering::SeqCst);
+    app.state::<AppState>().correction.cancel_all(&app);
     finish_recording(&app, false);
 }
 
@@ -632,7 +634,8 @@ async fn run_transcription(
         emit_processing(&app_handle, &crate::codes::code("status.dictionary"));
     }
 
-    let (final_text, llm_used) = postprocess_with_state(&state, &raw, llm_enabled).await?;
+    let (final_text, llm_used) =
+        postprocess_with_state(&app_handle, &state, &raw, llm_enabled).await?;
     crate::pipeline::log(
         "ptt",
         format!(
@@ -713,6 +716,7 @@ async fn transcribe_with_runtime(state: &AppState, audio: &[f32]) -> Result<Stri
 }
 
 async fn postprocess_with_state(
+    app: &tauri::AppHandle,
     state: &AppState,
     raw: &str,
     llm_enabled: bool,
@@ -721,33 +725,58 @@ async fn postprocess_with_state(
         let dict = state.dictionary.lock().map_err(|e| e.to_string())?;
         (dict.system_prompt(), dict.apply_replacements(raw))
     };
-    if !llm_enabled {
-        let dict = state.dictionary.lock().map_err(|e| e.to_string())?;
-        return Ok(PostProcessor::run(raw, &dict, None));
-    }
-    let (llm_provider, llm_url, llm_model) = {
+    let (mode, language, llm_provider, llm_url, llm_model) = {
         let cfg = state.config.lock().map_err(|e| e.to_string())?;
         (
+            crate::config::normalize_correction_mode(&cfg.runtime.correction_mode),
+            cfg.runtime.default_language.clone(),
             cfg.runtime.llm_provider.clone(),
             cfg.runtime.llm_url.clone(),
             cfg.runtime.llm_model.clone(),
         )
     };
-    if !crate::llm::provider_has_model(&llm_provider, &llm_url, &llm_model).await {
-        crate::pipeline::log(
-            "llm",
-            format!(
-                "skip rewrite: {llm_model} not ready on {llm_provider} — pasting STT+dictionary"
-            ),
-        );
+    if !llm_enabled || mode == "basic" {
         let dict = state.dictionary.lock().map_err(|e| e.to_string())?;
         return Ok(PostProcessor::run(raw, &dict, None));
     }
-    let llm_rewrite = crate::llm::rewrite(&llm_provider, &llm_url, &llm_model, &prompt, &with_dict)
-        .await
-        .ok();
+
+    let builtin = llm_provider == "murmullo" || mode == "browser";
+    if builtin {
+        emit_processing(app, &crate::codes::code("status.browserCorrecting"));
+        if let Some(outcome) = state.correction.request(app, &with_dict, language).await {
+            let rewrite = outcome.text.filter(|text| !text.trim().is_empty());
+            let dict = state.dictionary.lock().map_err(|e| e.to_string())?;
+            let (text, _) = PostProcessor::run(raw, &dict, rewrite);
+            return Ok((text, outcome.used_model));
+        }
+        let dict = state.dictionary.lock().map_err(|e| e.to_string())?;
+        return Ok(PostProcessor::run(raw, &dict, None));
+    }
+
+    if crate::llm::provider_has_model(&llm_provider, &llm_url, &llm_model).await {
+        let llm_rewrite =
+            crate::llm::rewrite(&llm_provider, &llm_url, &llm_model, &prompt, &with_dict)
+                .await
+                .ok();
+        if llm_rewrite
+            .as_ref()
+            .is_some_and(|text| !text.trim().is_empty())
+        {
+            let dict = state.dictionary.lock().map_err(|e| e.to_string())?;
+            return Ok(PostProcessor::run(raw, &dict, llm_rewrite));
+        }
+        crate::pipeline::log(
+            "llm",
+            format!("{llm_provider} returned no text — pasting STT+dictionary"),
+        );
+    } else {
+        crate::pipeline::log(
+            "llm",
+            format!("skip rewrite: {llm_model} not ready on {llm_provider}"),
+        );
+    }
     let dict = state.dictionary.lock().map_err(|e| e.to_string())?;
-    Ok(PostProcessor::run(raw, &dict, llm_rewrite))
+    Ok(PostProcessor::run(raw, &dict, None))
 }
 
 #[tauri::command]
@@ -819,6 +848,7 @@ pub async fn update_runtime_config(
     llm_provider: Option<String>,
     llm_model: String,
     default_language: Option<String>,
+    correction_mode: Option<String>,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
     let provider = llm_provider.unwrap_or_else(|| "ollama".into());
@@ -829,6 +859,7 @@ pub async fn update_runtime_config(
             provider.clone(),
             llm_model.clone(),
             default_language,
+            correction_mode,
         );
         config.save().map_err(|e| e.to_string())?;
         (
@@ -881,6 +912,50 @@ pub async fn rewrite_with_configured_llm(
             .await
             .ok(),
     )
+}
+
+#[tauri::command]
+pub fn register_browser_corrector(window: tauri::WebviewWindow, state: State<'_, AppState>) {
+    state.correction.register(window.label());
+}
+
+#[tauri::command]
+pub fn unregister_browser_corrector(window: tauri::WebviewWindow, state: State<'_, AppState>) {
+    state.correction.unregister(window.label());
+}
+
+#[tauri::command]
+pub fn submit_browser_correction(
+    id: String,
+    text: Option<String>,
+    used_model: bool,
+    state: State<'_, AppState>,
+) {
+    state.correction.submit(&id, text, used_model);
+}
+
+#[tauri::command]
+pub fn get_correction_status(state: State<'_, AppState>) -> crate::correction::CorrectionStatus {
+    state.correction.status()
+}
+
+#[tauri::command]
+pub fn report_correction_status(
+    status: crate::correction::CorrectionStatus,
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+) {
+    state.correction.report(&app, status);
+}
+
+#[tauri::command]
+pub fn cancel_browser_correction(app: tauri::AppHandle, state: State<'_, AppState>) {
+    state.correction.cancel_all(&app);
+}
+
+#[tauri::command]
+pub fn request_builtin_model_download(app: tauri::AppHandle) {
+    let _ = app.emit(crate::correction::DOWNLOAD_EVENT, ());
 }
 
 #[tauri::command]
@@ -982,6 +1057,29 @@ pub async fn remove_dictionary_entry(
         .map_err(|e| e.to_string())?
         .remove(&id)
         .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn get_correction_prompts() -> Result<crate::prompts::CorrectionPromptState, String> {
+    Ok(crate::prompts::state())
+}
+
+#[tauri::command]
+pub async fn set_correction_prompt(
+    slot: String,
+    text: Option<String>,
+    state: State<'_, AppState>,
+) -> Result<crate::prompts::CorrectionPromptState, String> {
+    let next = crate::prompts::set_override(&slot, text)?;
+    if slot == "provider" {
+        state
+            .dictionary
+            .lock()
+            .map_err(|err| err.to_string())?
+            .refresh_prompt()
+            .map_err(|err| err.to_string())?;
+    }
+    Ok(next)
 }
 
 #[tauri::command]
