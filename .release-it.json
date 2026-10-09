@@ -9,7 +9,7 @@
   "github": {
     "release": true,
     "releaseName": "Release v${version}",
-    "releaseNotes": "See CHANGELOG.md for details"
+    "releaseNotes": "echo 'See CHANGELOG.md for details'"
   },
   "npm": {
     "publish": false
