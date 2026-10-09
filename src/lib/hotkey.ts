@@ -84,6 +84,8 @@ export function hotkeyParts(binding?: string | null): string[] {
   return formatHotkey(binding).split('+').filter(Boolean);
 }
 
+const MAX_HOTKEY_KEYS = 3;
+
 export function shortcutFromKeyboardEvent(event: KeyboardEvent): string | null {
   if (MODIFIER_KEYS.has(event.key) || MODIFIER_KEYS.has(event.code)) {
     return null;
@@ -94,9 +96,6 @@ export function shortcutFromKeyboardEvent(event: KeyboardEvent): string | null {
   if (event.ctrlKey) parts.push('Ctrl');
   if (event.altKey) parts.push('Option');
   if (event.shiftKey) parts.push('Shift');
-  if (parts.length === 0) {
-    return null;
-  }
 
   const key = keyFromCode(event.code, event.key);
   if (!key) return null;
@@ -117,8 +116,11 @@ export function validateHotkey(
     .split('+')
     .map(token => token.trim())
     .filter(Boolean);
-  if (tokens.length < 2) {
-    return t('hotkey.needsModifier');
+  if (tokens.length === 0) {
+    return t('hotkey.empty');
+  }
+  if (tokens.length > MAX_HOTKEY_KEYS) {
+    return t('hotkey.tooManyKeys');
   }
 
   const display = formatHotkey(trimmed);

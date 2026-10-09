@@ -226,7 +226,7 @@ export const es = {
     inputDevice: 'Dispositivo de entrada',
     globalShortcuts: 'Atajos globales',
     hotkeyHint:
-      'Mantén pulsado para dictar. El atajo nuevo se aplica al instante, sin reiniciar.',
+      'Mantén pulsado para dictar. Puede ser una, dos o tres teclas. El atajo nuevo se aplica al instante, sin reiniciar.',
     hotkeyUpdated: 'Atajo actualizado',
     cancelAudio: 'Cancelación y audio',
     noise: 'Reducción de ruido',
@@ -292,8 +292,8 @@ export const es = {
     },
     sttLangAutoDetect: 'Detección automática',
     ptt: 'Push to talk',
-    pttListening: 'Pulsa la combinación… Esc cancela',
-    pttIdle: 'Haz clic y pulsa las teclas para cambiar',
+    pttListening: 'Pulsa 1–3 teclas… Esc cancela',
+    pttIdle: 'Haz clic y pulsa de una a tres teclas para cambiar',
     listening: 'Escuchando…',
     hotkeySaveFailed: 'No se pudo guardar el atajo',
     balanced: 'Equilibrado',
@@ -327,7 +327,7 @@ export const es = {
   },
   hotkey: {
     empty: 'El atajo no puede estar vacío',
-    needsModifier: 'Incluye al menos un modificador y una tecla',
+    tooManyKeys: 'Como máximo tres teclas (por ejemplo Cmd+Option+T)',
     reserved: 'Ese atajo está reservado por el sistema',
     conflict: 'Ese atajo ya está asignado a otra acción',
   },
@@ -452,8 +452,8 @@ export const es = {
     hotkey: {
       empty: 'El atajo no puede estar vacío',
       invalid: 'Atajo no válido',
-      needs_modifier:
-        'El atajo necesita al menos un modificador (Cmd, Ctrl, Alt o Shift)',
+      too_many_keys:
+        'Como máximo tres teclas (por ejemplo Cmd+Option+T)',
       conflict: 'Ese atajo ya está asignado a otra acción',
       register_failed:
         'No se pudo registrar el atajo. Puede estar en uso por el sistema u otra aplicación.',
