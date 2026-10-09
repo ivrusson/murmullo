@@ -9,6 +9,8 @@ Murmullo is still **beta**. Versions stay on the `0.x` line until the product is
 
 ## [Unreleased]
 
+## [0.8.1] - 2026-10-09
+
 ### Fixed
 
 - The floating bar accepts clicks and can be dragged again. Text on the pill and the mascot still

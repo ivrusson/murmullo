@@ -1,3 +1,5 @@
+version = "0.8.1"
+
 [package]
 name = "murmullo"
 version = "0.8.0"
