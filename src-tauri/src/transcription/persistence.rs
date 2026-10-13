@@ -108,6 +108,8 @@ impl TranscriptionPersistence {
         )
     }
 
+    // Mirrors the stored record field by field; callers build it in one place.
+    #[allow(clippy::too_many_arguments)]
     pub fn add_transcription_with_raw(
         &self,
         database: &mut TranscriptionDatabase,

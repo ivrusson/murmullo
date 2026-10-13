@@ -179,7 +179,7 @@ impl AudioProcessor {
         }
         const TARGET: f32 = 0.75;
         const MAX_SCALE: f32 = 40.0;
-        let scale = (TARGET / max_abs).min(MAX_SCALE).max(1.0);
+        let scale = (TARGET / max_abs).clamp(1.0, MAX_SCALE);
         if (scale - 1.0).abs() < 0.05 {
             pipeline::log(
                 "audio",
@@ -205,7 +205,7 @@ impl AudioProcessor {
             return audio_data;
         }
 
-        let threshold = self.config.silence_threshold.min(0.004).max(0.001);
+        let threshold = self.config.silence_threshold.clamp(0.001, 0.004);
         let pad = 3200; // 200 ms @ 16 kHz
         let first = audio_data.iter().position(|&x| x.abs() > threshold);
         let last = audio_data.iter().rposition(|&x| x.abs() > threshold);

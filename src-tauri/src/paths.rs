@@ -95,11 +95,11 @@ fn legacy_data_dir() -> Option<PathBuf> {
 fn legacy_log_file() -> PathBuf {
     #[cfg(target_os = "macos")]
     {
-        return home_dir()
+        home_dir()
             .join("Library")
             .join("Logs")
             .join("murmullo")
-            .join("murmullo.log");
+            .join("murmullo.log")
     }
     #[cfg(not(target_os = "macos"))]
     {

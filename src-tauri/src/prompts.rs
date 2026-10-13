@@ -67,7 +67,7 @@ fn normalize_override(text: Option<String>) -> Option<String> {
 }
 
 fn load() -> CorrectionPromptOverrides {
-    let _ = crate::paths::ensure_layout();
+    crate::paths::ensure_layout();
     fs::read_to_string(crate::paths::correction_prompts_file())
         .ok()
         .and_then(|raw| serde_json::from_str(&raw).ok())
@@ -75,7 +75,7 @@ fn load() -> CorrectionPromptOverrides {
 }
 
 fn save(stored: &CorrectionPromptOverrides) -> Result<(), String> {
-    let _ = crate::paths::ensure_layout();
+    crate::paths::ensure_layout();
     let raw = serde_json::to_string_pretty(stored).map_err(|err| err.to_string())?;
     fs::write(crate::paths::correction_prompts_file(), raw).map_err(|err| err.to_string())
 }

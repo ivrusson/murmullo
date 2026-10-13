@@ -56,10 +56,10 @@ pub fn os_label() -> String {
             .and_then(|output| String::from_utf8(output.stdout).ok())
             .map(|text| text.trim().to_string())
             .filter(|text| !text.is_empty());
-        return match version {
+        match version {
             Some(ver) => format!("macOS {ver} ({})", std::env::consts::ARCH),
             None => format!("macOS ({})", std::env::consts::ARCH),
-        };
+        }
     }
     #[cfg(not(target_os = "macos"))]
     {
