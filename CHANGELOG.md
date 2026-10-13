@@ -9,6 +9,8 @@ Murmullo is still **beta**. Versions stay on the `0.x` line until the product is
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-10-13
+
 ### Added
 
 - **Updates from Settings.** A new Updates card checks whether a newer release exists, shows the
