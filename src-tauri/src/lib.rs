@@ -15,6 +15,7 @@ mod postprocess;
 mod prompts;
 mod runtime;
 mod transcription;
+mod updater;
 
 use audio::{AudioCapture, AudioProcessor};
 use commands::{
@@ -175,6 +176,7 @@ pub fn run() {
             })?;
 
             crate::crash::show_if_pending(app.handle());
+            crate::updater::announce_if_just_updated();
 
             let runtime_boot = runtime.clone();
             let models_boot = model_manager.clone();
@@ -249,6 +251,11 @@ pub fn run() {
             resize_overlay,
             show_main_window,
             get_app_info,
+            updater::check_for_update,
+            updater::start_update,
+            updater::get_update_status,
+            updater::clear_update_status,
+            updater::get_update_log,
             get_runtime_status,
             get_pipeline_logs,
             get_pipeline_log_path,
