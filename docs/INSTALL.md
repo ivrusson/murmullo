@@ -92,6 +92,19 @@ it:
 3. runs the installer that ships with the new version (toolchain check, `pnpm install`),
 4. starts `pnpm tauri dev` again.
 
+### From the app
+
+**Settings → Updates** does the same without a terminal: _Check for updates_ looks up the newest
+release, _What's new_ shows the changelog entries you would get, and _Update now_ runs `update.sh`
+in the background. The card shows live progress (release download, dependency download, apply,
+install, reopen). Murmullo closes itself when the files are about to change and comes back on the
+new version. The first launch compiles for a few minutes with no window, so a macOS notification
+says so when it starts and another when Murmullo is ready. If something fails before the switch,
+nothing was changed and the card offers _Try again_ and the updater log.
+
+It only works for a source install (the app must have been built from a git clone) and nothing is
+checked until you press the button: Murmullo stays offline otherwise.
+
 The updater downloads the release and its dependencies _before_ touching any file, with the app
 still running, so a failed download never leaves a half-updated checkout.
 

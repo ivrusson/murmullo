@@ -13,6 +13,7 @@ import type {
   MacosPermissionStatus,
   LlmProviderInfo,
 } from '../types';
+import type { UpdateInfo, UpdateStatus } from '../updates/progress';
 
 export const audioService = {
   async listDevices(): Promise<AudioDevice[]> {
@@ -237,5 +238,23 @@ export const appService = {
   },
   async getAppInfo(): Promise<string> {
     return await invoke('get_app_info');
+  },
+};
+
+export const updateService = {
+  async check(): Promise<UpdateInfo> {
+    return await invoke('check_for_update');
+  },
+  async start(target: string, lang: string): Promise<void> {
+    return await invoke('start_update', { target, lang });
+  },
+  async status(): Promise<UpdateStatus | null> {
+    return await invoke('get_update_status');
+  },
+  async clear(): Promise<void> {
+    return await invoke('clear_update_status');
+  },
+  async log(): Promise<string> {
+    return await invoke('get_update_log');
   },
 };

@@ -329,6 +329,56 @@ export const en: Messages = {
     hotkeySaveFailed: 'Could not save the shortcut',
     balanced: 'Balanced',
   },
+  updates: {
+    title: 'Updates',
+    body: 'Murmullo is installed from the repository. See whether a new version is out, what it brings, and update without opening a terminal.',
+    installed: 'Installed version',
+    check: 'Check for updates',
+    checking: 'Checking…',
+    upToDate: "You're up to date",
+    upToDateBody: 'You have the latest version, v{version}.',
+    available: 'A new version is available: v{version}',
+    availableBody:
+      'You have v{current}. Updating downloads the new version, reinstalls and reopens Murmullo.',
+    update: 'Update now',
+    whatsNew: "What's new",
+    hideNotes: 'Hide notes',
+    noNotes: 'This version has no published notes.',
+    localChanges:
+      "There are local changes in Murmullo's folder. Save or discard them before updating.",
+    unsupported:
+      'In-app updates only work for installs made from the repository. Run ./update.sh in a terminal.',
+    updatingTo: 'Updating to v{version}',
+    preparing: 'Preparing…',
+    keepOpenNote:
+      'Murmullo will close and reopen by itself. After updating, the first launch can take a few minutes to compile.',
+    steps: {
+      release: 'Download the release',
+      dependencies: 'Download dependencies',
+      apply: 'Apply the release',
+      install: 'Install',
+      restart: 'Reopen Murmullo',
+    },
+    failedTitle: 'The update failed',
+    interrupted: 'The update was interrupted before it finished.',
+    nothingChanged:
+      'If it failed before applying the release, nothing was changed.',
+    showLog: 'Show log',
+    hideLog: 'Hide log',
+    retry: 'Try again',
+    dismiss: 'Dismiss',
+    doneTitle: 'Updated to v{version}',
+    doneBody: 'Murmullo restarted on the new version.',
+    doneToast: 'Murmullo updated to v{version}',
+    groups: {
+      Added: 'Added',
+      Changed: 'Changed',
+      Fixed: 'Fixed',
+      Removed: 'Removed',
+      Deprecated: 'Deprecated',
+      Security: 'Security',
+    },
+  },
   feedback: {
     helpTitle: 'Help',
     helpBody:
@@ -451,6 +501,17 @@ export const en: Messages = {
     translatingShort: 'Translating…',
   },
   errors: {
+    update: {
+      not_source_install:
+        "This copy of Murmullo is not a repository clone, so it can't be updated from the app.",
+      check_failed:
+        "Couldn't look up the latest version. Check your connection and try again.",
+      no_release: 'There is no published release yet.',
+      local_changes:
+        "There are local changes in Murmullo's folder. Save or discard them before updating.",
+      already_running: 'An update is already running.',
+      spawn_failed: "Couldn't start the updater.",
+    },
     generic: 'Could not complete the action. Check Runtimes or try again.',
     dictation: 'Dictation error',
     audio: {

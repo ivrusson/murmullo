@@ -327,6 +327,56 @@ export const es = {
     hotkeySaveFailed: 'No se pudo guardar el atajo',
     balanced: 'Equilibrado',
   },
+  updates: {
+    title: 'Actualizaciones',
+    body: 'Murmullo se instala desde el repositorio. Aquí ves si hay una versión nueva, qué trae y puedes actualizar sin abrir la terminal.',
+    installed: 'Versión instalada',
+    check: 'Buscar actualizaciones',
+    checking: 'Buscando…',
+    upToDate: 'Estás al día',
+    upToDateBody: 'Tienes la última versión, v{version}.',
+    available: 'Hay una versión nueva: v{version}',
+    availableBody:
+      'Tienes la v{current}. Actualizar descarga la nueva versión, reinstala y vuelve a abrir Murmullo.',
+    update: 'Actualizar ahora',
+    whatsNew: 'Novedades',
+    hideNotes: 'Ocultar novedades',
+    noNotes: 'Esta versión no trae notas publicadas.',
+    localChanges:
+      'Hay cambios locales en la carpeta de Murmullo. Guárdalos o descártalos antes de actualizar.',
+    unsupported:
+      'Las actualizaciones desde la app solo funcionan en instalaciones hechas desde el repositorio. Usa ./update.sh en la terminal.',
+    updatingTo: 'Actualizando a v{version}',
+    preparing: 'Preparando…',
+    keepOpenNote:
+      'Murmullo se cerrará y volverá a abrirse solo. Tras actualizar, la primera apertura puede tardar unos minutos en compilar.',
+    steps: {
+      release: 'Descargar la versión',
+      dependencies: 'Descargar dependencias',
+      apply: 'Aplicar la versión',
+      install: 'Instalar',
+      restart: 'Reabrir Murmullo',
+    },
+    failedTitle: 'No se pudo actualizar',
+    interrupted: 'La actualización se interrumpió antes de terminar.',
+    nothingChanged:
+      'Si falló antes de aplicar la versión, no se ha cambiado nada.',
+    showLog: 'Ver registro',
+    hideLog: 'Ocultar registro',
+    retry: 'Reintentar',
+    dismiss: 'Descartar',
+    doneTitle: 'Actualizado a v{version}',
+    doneBody: 'Murmullo se ha reiniciado con la nueva versión.',
+    doneToast: 'Murmullo se actualizó a v{version}',
+    groups: {
+      Added: 'Novedades',
+      Changed: 'Cambios',
+      Fixed: 'Correcciones',
+      Removed: 'Eliminado',
+      Deprecated: 'En desuso',
+      Security: 'Seguridad',
+    },
+  },
   feedback: {
     helpTitle: 'Ayuda',
     helpBody:
@@ -449,6 +499,17 @@ export const es = {
     translatingShort: 'Traduciendo…',
   },
   errors: {
+    update: {
+      not_source_install:
+        'Esta copia de Murmullo no viene de un clon del repositorio, así que no se puede actualizar desde la app.',
+      check_failed:
+        'No se pudo consultar la última versión. Revisa tu conexión e inténtalo de nuevo.',
+      no_release: 'No hay ninguna versión publicada todavía.',
+      local_changes:
+        'Hay cambios locales en la carpeta de Murmullo. Guárdalos o descártalos antes de actualizar.',
+      already_running: 'Ya hay una actualización en curso.',
+      spawn_failed: 'No se pudo arrancar el actualizador.',
+    },
     generic:
       'No se pudo completar la acción. Revisa Runtimes o inténtalo de nuevo.',
     dictation: 'Error de dictado',

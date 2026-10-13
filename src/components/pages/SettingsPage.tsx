@@ -29,6 +29,7 @@ import { Button } from '@/components/ui-system/Button';
 import { color, font, space } from '@/styles/tokens.stylex';
 import { sx } from '@/components/ui-system/sx';
 import { FeedbackLaunchButtons } from '@/components/FeedbackDialog';
+import { UpdateCard } from '@/updates/UpdateCard';
 
 const styles = stylex.create({
   grid: {
@@ -379,6 +380,7 @@ export function SettingsPage() {
           ) : null}
         </div>
       )}
+      <UpdateCard />
       <HelpCard />
     </PageFrame>
   );

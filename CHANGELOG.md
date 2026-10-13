@@ -11,8 +11,12 @@ Murmullo is still **beta**. Versions stay on the `0.x` line until the product is
 
 ### Added
 
+- **Settings → Updates**: check for a new release, read its changelog and update from the app, with
+  live progress for each step. Source installs only; nothing is checked until you ask.
 - The updater downloads the release and its dependencies before changing any file, while the app
   keeps running, so a failed download changes nothing.
+- After an in-app update, macOS notifications announce the compile that follows and tell you when
+  Murmullo is ready again.
 - `./update.sh` (and `update.command` on macOS) looks up the newest release, asks, checks it out,
   reinstalls and relaunches the app. `--check` only reports.
 - `install.sh` sets the checkout to the latest stable release tag instead of leaving a fresh clone
