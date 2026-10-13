@@ -172,9 +172,9 @@ impl ModelManager {
     }
 
     pub fn is_model_downloaded(&self, name: &str) -> bool {
-        self.available_models.get(name).map_or(false, |m| {
-            m.is_downloaded && self.models_dir.join(&m.path).exists()
-        })
+        self.available_models
+            .get(name)
+            .is_some_and(|m| m.is_downloaded && self.models_dir.join(&m.path).exists())
     }
 
     pub fn get_model_path(&self, name: &str) -> Option<String> {

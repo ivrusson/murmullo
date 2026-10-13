@@ -95,8 +95,7 @@ impl AudioCapture {
                     println!("✅ Selected default device: {}", name);
                 }
             }
-        } else if device_id.starts_with("device_") {
-            let index_str = &device_id[7..]; // Remove "device_" prefix
+        } else if let Some(index_str) = device_id.strip_prefix("device_") {
             if let Ok(index) = index_str.parse::<usize>() {
                 let devices: Vec<_> = self.host.input_devices()?.collect();
                 if index < devices.len() {
@@ -418,7 +417,7 @@ impl AudioCapture {
         // Convert f32 samples to i16 and write
         for &sample in audio_data {
             // Clamp sample to [-1.0, 1.0] range
-            let clamped_sample = sample.max(-1.0).min(1.0);
+            let clamped_sample = sample.clamp(-1.0, 1.0);
             // Convert to i16 range
             let sample_i16 = (clamped_sample * i16::MAX as f32) as i16;
             writer.write_sample(sample_i16)?;
