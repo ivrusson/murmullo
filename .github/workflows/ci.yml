@@ -60,6 +60,18 @@ jobs:
       - name: Build Tauri app (debug)
         run: pnpm tauri build --debug
 
+  installer:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [macos-latest, ubuntu-latest]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Test installer and updater
+        run: bash scripts/test-installer.sh
+
   security-scan:
     runs-on: ubuntu-latest
     steps:

@@ -2,7 +2,7 @@
 
 Signed macOS / Windows / Linux packages are not the default path yet. Until those builds ship, clone
 this repo and run the **guided installer**. It checks the toolchain, offers to install what is
-missing, then runs `pnpm install`.
+missing, sets the checkout to the **latest release**, then runs `pnpm install`.
 
 Dictation (global hotkey + paste into the focused app) is **macOS 12+**. Windows and Linux can
 compile the app for development; paste is still pending.
@@ -50,12 +50,54 @@ with `sudo`.
 | `--yes` / `-Yes`              | Accept defaults: install missing tools, do not compile, do not launch |
 | `--dev` / `-Dev`              | Start `pnpm tauri dev` when setup finishes                            |
 | `--build` / `-Build`          | Compile a release bundle (`pnpm tauri build`)                         |
-| `--dry-run` / `-DryRun`       | Only print what is present / missing                                  |
+| `--no-launch`                 | Never start the app or ask about it (setup only)                      |
+| `--dry-run` / `-DryRun`       | Only print what is present / missing, and which release is latest     |
 | `--lang es` or `en` / `-Lang` | Force installer language                                              |
 | `--dir PATH` / `-Dir`         | Clone destination if you are not already in the repo                  |
+| `--ref REF`                   | Check out this tag or branch instead of the latest release            |
+| `--no-pin`                    | Keep the current checkout; do not switch to the latest release        |
+| `--update`, `--check`         | Updater modes, see [Updating](#updating)                              |
+
+`--ref`, `--no-pin`, `--update`, `--check` and `--no-launch` are macOS / Linux only for now;
+`install.ps1` does not pin a release or update yet.
 
 `--yes` is safe for a fresh machine: it will not start a GUI or spend twenty minutes compiling
 unless you also pass `--dev` or `--build`.
+
+## Which version you get
+
+`main` can be ahead of the last release. The installer asks GitHub for the newest stable tag
+(`vX.Y.Z`; prerelease tags such as `v1.0.0-beta.1` are skipped) and checks it out in detached HEAD,
+so `git status` says `HEAD detached at v0.8.2`. Then it reinstalls on that version. It leaves the
+checkout alone when:
+
+- you are on a branch other than `main` (a development checkout),
+- tracked files have local changes (it never discards work),
+- GitHub cannot be reached (offline); setup continues on the current version.
+
+Pass `--ref v0.8.1` (or a branch) to pick something else, `--no-pin` to keep what you have.
+
+## Updating
+
+```bash
+./update.sh            # macOS / Linux — or double-click update.command on a Mac
+./update.sh --check    # only look: exit 0 = up to date, 10 = update available
+```
+
+The updater compares the installed version with the newest release tag, tells you, and asks. On yes
+it:
+
+1. stops Murmullo if it is running from this folder,
+2. fetches and checks out the new release (refuses if tracked files have local changes),
+3. runs the installer that ships with the new version (toolchain check, `pnpm install`),
+4. starts `pnpm tauri dev` again.
+
+The updater downloads the release and its dependencies _before_ touching any file, with the app
+still running, so a failed download never leaves a half-updated checkout.
+
+`--yes` skips the questions and `--no-launch` stops after reinstalling. This is
+`install.sh --update` under the hood, so the same toolchain checks apply. It updates the source
+checkout; there is no binary to replace yet.
 
 ## What it installs (if missing)
 
@@ -103,6 +145,9 @@ If you prefer not to use the assistant:
 pnpm install
 pnpm tauri dev
 ```
+
+Run `bash scripts/test-installer.sh` to exercise the installer and updater against a throwaway local
+origin (no network, stubbed toolchain).
 
 Release compile (slow the first time):
 

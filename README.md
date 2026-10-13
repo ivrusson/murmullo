@@ -67,9 +67,12 @@ cd murmullo
 ```
 
 The assistant is bilingual (Spanish if `LANG` starts with `es`). It checks git, Xcode Command Line
-Tools, Node.js 18+, Rust, and pnpm, offers to install what is missing, then runs `pnpm install`. It
-can compile (`--build`) or launch (`--dev`). It does **not** fetch the 714 MB speech model — that
-stays a first-run step in Runtimes, with checksums.
+Tools, Node.js 18+, Rust, and pnpm, offers to install what is missing, sets the checkout to the
+latest release, then runs `pnpm install`. It can compile (`--build`) or launch (`--dev`). It does
+**not** fetch the 714 MB speech model — that stays a first-run step in Runtimes, with checksums.
+
+To update later, run `./update.sh` (or double-click `update.command`). It looks up the newest
+release, asks, checks it out, reinstalls and relaunches the app. `./update.sh --check` only reports.
 
 Flags and troubleshooting: [docs/INSTALL.md](docs/INSTALL.md). Using the app, models, and Settings:
 [docs/USAGE.md](docs/USAGE.md).
