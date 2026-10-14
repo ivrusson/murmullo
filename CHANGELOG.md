@@ -9,25 +9,44 @@ Murmullo is still **beta**. Versions stay on the `0.x` line until the product is
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-10-13
+
 ### Added
 
-- **Settings → Updates**: check for a new release, read its changelog and update from the app, with
-  live progress for each step. Source installs only; nothing is checked until you ask.
-- The updater downloads the release and its dependencies before changing any file, while the app
-  keeps running, so a failed download changes nothing.
-- After an in-app update, macOS notifications announce the compile that follows and tell you when
-  Murmullo is ready again.
-- `./update.sh` (and `update.command` on macOS) looks up the newest release, asks, checks it out,
-  reinstalls and relaunches the app. `--check` only reports.
-- `install.sh` sets the checkout to the latest stable release tag instead of leaving a fresh clone
-  on `main`. `--ref` picks another tag or branch, `--no-pin` keeps the current one, `--no-launch`
-  skips starting the app. Development branches and local changes are left alone.
-- `scripts/test-installer.sh` exercises the installer and updater against a local origin.
+- **Updates from Settings.** A new Updates card checks whether a newer release exists, shows the
+  changelog entries you would get, and updates without opening a terminal. While it works you see a
+  live progress bar and the current step: download the release, download dependencies, apply,
+  install, reopen. If something fails before the switch, nothing was changed; the card offers Try
+  again and the updater log. Nothing is checked until you press the button, so Murmullo stays
+  offline otherwise. It works for installs made from a git clone.
+- **`./update.sh`** (and `update.command` on macOS) does the same from a terminal: it looks up the
+  newest release, asks, checks it out, reinstalls and relaunches the app. `./update.sh --check` only
+  reports (exit 0 when up to date, 10 when an update is available).
+- **A failed download changes nothing.** The updater downloads the release and its dependencies
+  first, while the app keeps running and the files are untouched. Only then does it close the app,
+  switch versions, reinstall and reopen it.
+- **macOS notifications after an in-app update.** The first launch compiles for a few minutes with
+  no window, so a notification says so when it starts and another when Murmullo is ready.
+- **`scripts/test-installer.sh`** runs the installer and updater end to end against a throwaway
+  local origin with a stubbed toolchain, no network needed.
+
+### Changed
+
+- **`install.sh` installs the latest release.** A fresh clone sits on `main`, which can be ahead of
+  the last release; the installer now checks out the newest stable `vX.Y.Z` tag (prerelease tags are
+  ignored). It leaves a feature branch or tracked local changes alone, and keeps going offline. New
+  options: `--ref` (another tag or branch), `--no-pin`, `--no-launch`, `--update`, `--check`.
+- **The release pipeline no longer starts on tag push.** It failed on every tag since v0.1.0 and
+  produced no installers, so it now runs only when started by hand from the Actions tab. Pushing a
+  tag is enough for the updater to see a new version.
 
 ### Fixed
 
 - The installer warns when Node.js is older than 18 instead of reporting it as fine.
 - `install.sh --dry-run` outside a clone no longer stops with a `cd` error.
+- The Rust code passes `cargo clippy -- -D warnings` again (ten findings that predate this release).
+  No behaviour change except that a `NaN` audio sample is now written as silence instead of full
+  scale.
 
 ## [0.8.2] - 2026-10-09
 

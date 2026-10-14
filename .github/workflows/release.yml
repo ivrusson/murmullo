@@ -1,9 +1,8 @@
 name: Release Pipeline
 
+# Manual only. Pushing a tag used to start this, but the build has failed on every tag since
+# v0.1.0 and the installers are not signed yet. Start it from the Actions tab when that is fixed.
 on:
-  push:
-    tags:
-      - 'v*'
   workflow_dispatch:
     inputs:
       version:
