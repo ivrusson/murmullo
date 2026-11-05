@@ -55,7 +55,7 @@ const styles = stylex.create({
   },
   copy: {
     margin: 0,
-    color: '#5A5551',
+    color: color.inkSoft,
     fontFamily: font.sans,
     fontSize: 13,
     lineHeight: '20px',
@@ -72,7 +72,7 @@ const styles = stylex.create({
     paddingBlock: 14,
     paddingInline: 16,
     borderRadius: 20,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: color.card,
     borderColor: color.line,
     borderStyle: 'solid',
     borderWidth: 1,

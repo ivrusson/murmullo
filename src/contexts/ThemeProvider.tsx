@@ -65,7 +65,7 @@ export function AppThemeProvider({ children }: { children: ReactNode }) {
   return (
     <NextThemesProvider
       attribute="class"
-      defaultTheme="light"
+      defaultTheme="system"
       enableSystem
       disableTransitionOnChange
       storageKey={THEME_STORAGE_KEY}

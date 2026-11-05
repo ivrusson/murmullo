@@ -1,6 +1,6 @@
 import type { HTMLAttributes } from 'react';
 import * as stylex from '@stylexjs/stylex';
-import { font, radius } from '@/styles/tokens.stylex';
+import { color, font, radius } from '@/styles/tokens.stylex';
 import { sx } from '@/components/ui-system/sx';
 import type { MurmulloContextLabel } from '@/lib/pendingDictationContext';
 import { contextDisplayLabel } from '@/lib/pendingDictationContext';
@@ -21,24 +21,24 @@ const styles = stylex.create({
     flexShrink: 0,
   },
   trabajo: {
-    backgroundColor: '#F4E9C8',
-    color: '#8A6A1E',
+    backgroundColor: color.toneAmberBg,
+    color: color.toneAmberInk,
   },
   comunicacion: {
-    backgroundColor: '#FDF0F0',
-    color: '#A44C47',
+    backgroundColor: color.toneBlushBg,
+    color: color.toneBlushInk,
   },
   diseno: {
-    backgroundColor: '#F4F0F9',
-    color: '#6E5696',
+    backgroundColor: color.toneIrisBg,
+    color: color.toneIrisInk,
   },
   reuniones: {
-    backgroundColor: '#FDF0F0',
-    color: '#A44C47',
+    backgroundColor: color.toneBlushBg,
+    color: color.toneBlushInk,
   },
   personal: {
-    backgroundColor: '#EDF4EE',
-    color: '#47784E',
+    backgroundColor: color.toneSageBg,
+    color: color.toneSageInk,
   },
 });
 

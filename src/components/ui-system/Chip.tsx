@@ -20,36 +20,36 @@ const styles = stylex.create({
     flexShrink: 0,
   },
   muted: {
-    backgroundColor: 'rgba(28, 26, 25, 0.05)',
+    backgroundColor: color.wash,
     color: color.muted,
   },
   iris: {
-    backgroundColor: '#F4F0F9',
-    color: '#6E5696',
+    backgroundColor: color.toneIrisBg,
+    color: color.toneIrisInk,
   },
   live: {
-    backgroundColor: '#EDF4EE',
-    color: '#47784E',
+    backgroundColor: color.toneSageBg,
+    color: color.toneSageInk,
   },
   danger: {
-    backgroundColor: '#FDF0F0',
-    color: '#A44C47',
+    backgroundColor: color.toneBlushBg,
+    color: color.toneBlushInk,
   },
   trabajo: {
-    backgroundColor: '#F4E9C8',
-    color: '#8A6A1E',
+    backgroundColor: color.toneAmberBg,
+    color: color.toneAmberInk,
   },
   diseno: {
-    backgroundColor: '#F4F0F9',
-    color: '#6E5696',
+    backgroundColor: color.toneIrisBg,
+    color: color.toneIrisInk,
   },
   reuniones: {
-    backgroundColor: '#FDF0F0',
-    color: '#A44C47',
+    backgroundColor: color.toneBlushBg,
+    color: color.toneBlushInk,
   },
   personal: {
-    backgroundColor: '#EDF4EE',
-    color: '#47784E',
+    backgroundColor: color.toneSageBg,
+    color: color.toneSageInk,
   },
 });
 

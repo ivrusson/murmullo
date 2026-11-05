@@ -31,7 +31,7 @@ const styles = stylex.create({
     borderColor: color.line,
     borderRadius: radius.pill,
     backgroundColor: {
-      default: '#FFFFFF',
+      default: color.card,
       ':hover': color.raised,
     },
     color: color.ink,

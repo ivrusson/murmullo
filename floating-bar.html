@@ -18,7 +18,8 @@
             '(prefers-color-scheme: dark)'
           ).matches;
           var isDark =
-            stored === 'dark' || (stored === 'system' && prefersDark);
+            stored === 'dark' ||
+            ((!stored || stored === 'system') && prefersDark);
           document.documentElement.classList.toggle('dark', isDark);
           document.documentElement.style.colorScheme = isDark
             ? 'dark'

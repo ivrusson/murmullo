@@ -149,7 +149,7 @@ const styles = stylex.create({
     minHeight: 0,
     overflowX: 'hidden',
     overflowY: 'auto',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: color.card,
   },
   detailHead: {
     display: 'flex',
@@ -199,7 +199,7 @@ const styles = stylex.create({
     borderRadius: 20,
     backgroundColor: {
       default: color.surface,
-      ':hover': '#FFFFFF',
+      ':hover': color.card,
     },
     color: 'inherit',
     boxShadow: {
@@ -231,7 +231,7 @@ const styles = stylex.create({
     },
   },
   active: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: color.card,
     boxShadow: shadow.card,
     borderColor: 'rgba(138, 127, 214, 0.35)',
   },
@@ -274,7 +274,7 @@ const styles = stylex.create({
   },
   snippet: {
     margin: 0,
-    color: '#5A5551',
+    color: color.inkSoft,
     fontFamily: font.sans,
     fontSize: 12,
     lineHeight: '16px',

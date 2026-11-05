@@ -20,7 +20,7 @@ const styles = stylex.create({
     color: color.ink,
   },
   copy: {
-    color: '#5A5551',
+    color: color.inkSoft,
     fontFamily: font.sans,
     fontSize: 14,
     lineHeight: '22px',
