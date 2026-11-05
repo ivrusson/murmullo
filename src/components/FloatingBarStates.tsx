@@ -1,27 +1,35 @@
 import {
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
+  type CSSProperties,
   type MouseEventHandler,
   type PointerEventHandler,
   type ReactNode,
 } from 'react';
 import {
+  ArrowDown,
+  ArrowLeft,
+  ArrowRight,
+  ArrowUp,
   Check,
   Copy,
-  Keyboard,
   Mic,
   MoreHorizontal,
-  Play,
-  Search,
-  Settings,
-  Sparkles,
+  Pencil,
   Square,
   X,
 } from 'lucide-react';
 import { MurmulloView, type MurmulloSceneMode } from '@/mascot/MurmulloView';
-import type { OverlayStyle } from '@/lib/overlayStyle';
-import { WaveformVisualization } from './WaveformVisualization';
+import type { OverlayAnchor } from '@/lib/overlayAnchor';
+import {
+  HUD_MASCOT_DISPLAY,
+  panelShift,
+  type HudPanelKind,
+  type HudPoint,
+} from '@/lib/overlayFrame';
+import type { OverlayWorkArea } from '@/lib/overlayPlacement';
 import { t, translateBackendMessage } from '@/i18n';
 
 export type HudMode =
@@ -32,12 +40,8 @@ export type HudMode =
   | 'done'
   | 'transcribed'
   | 'actions'
-  | 'compact'
   | 'cancelled'
-  | 'error'
-  | 'menu'
-  | 'history'
-  | 'controls';
+  | 'error';
 
 export type HudHistoryItem = {
   id: string;
@@ -55,51 +59,55 @@ export type HudTranscription = {
   model_used: string;
 };
 
-/** Render size of the 2D scene. CSS scales this down in pill/island modes. */
+/** Render size of the 2D scene; CSS scales the resting mascot. */
 export const HUD_MASCOT_RENDER_SIZE = 140;
-export const HUD_MASCOT_PILL_SIZE = 48;
+/** Resting on-screen size; scene is rendered at 140 and scaled down. */
+export const HUD_MASCOT_DISPLAY_SIZE = HUD_MASCOT_DISPLAY;
 
-export type MascotPlacement = 'rest' | 'inset' | 'perch';
+export type OrbitalActionId = 'dictate' | 'more' | 'stop' | 'cancel';
+
+export type OrbitalAction = {
+  id: OrbitalActionId;
+  label: string;
+  icon: ReactNode;
+};
 
 type MascotProps = {
-  placement: MascotPlacement;
   sceneMode: MurmulloSceneMode;
   level?: number;
+  active?: boolean;
   onMouseDown?: MouseEventHandler<HTMLDivElement>;
   onPointerEnter?: PointerEventHandler<HTMLDivElement>;
   onPointerLeave?: PointerEventHandler<HTMLDivElement>;
   onContextMenu?: MouseEventHandler<HTMLDivElement>;
+  onClick?: MouseEventHandler<HTMLDivElement>;
 };
 
 export function HudMascot({
-  placement,
   sceneMode,
   level,
+  active = false,
   onMouseDown,
   onPointerEnter,
   onPointerLeave,
   onContextMenu,
+  onClick,
 }: MascotProps) {
-  const className =
-    placement === 'rest'
-      ? 'hud-mascot-rest'
-      : placement === 'perch'
-        ? 'hud-mascot-perch'
-        : 'hud-mascot';
   return (
     <div
-      className={className}
+      className={`hud-mascot${active ? ' is-active' : ''}`}
       data-hud-hit=""
       onMouseDown={onMouseDown}
       onPointerEnter={onPointerEnter}
       onPointerLeave={onPointerLeave}
       onContextMenu={onContextMenu}
+      onClick={onClick}
     >
       <div className="hud-mascot-scene">
         <MurmulloView
           kind="2d"
           size={HUD_MASCOT_RENDER_SIZE}
-          frame={placement === 'rest' ? 'haze' : 'body'}
+          frame="haze"
           sceneMode={sceneMode}
           level={level}
           interactive={false}
@@ -109,920 +117,156 @@ export function HudMascot({
   );
 }
 
-export function HudStage({
-  style,
-  mode,
-  width,
-  mascot,
-  onMouseDown,
-  onPointerEnter,
-  onPointerLeave,
-  children,
+export function HudOrbitalActions({
+  visible,
+  left,
+  right,
+  onAction,
 }: {
-  style: OverlayStyle;
-  mode: HudMode;
-  width: number;
-  mascot: ReactNode;
-  onMouseDown?: MouseEventHandler<HTMLDivElement>;
-  onPointerEnter?: PointerEventHandler<HTMLDivElement>;
-  onPointerLeave?: PointerEventHandler<HTMLDivElement>;
-  children: ReactNode;
+  visible: boolean;
+  left: OrbitalAction[];
+  right: OrbitalAction[];
+  onAction: (id: OrbitalActionId) => void;
 }) {
-  const rest = mode === 'rest';
-  const chromeProps = {
-    'data-hud-hit': '',
-    onMouseDown,
-    onPointerEnter,
-    onPointerLeave,
-  };
-
-  if (style === 'card') {
-    return (
-      <div className={`hud-stage is-card${rest ? ' is-rest' : ''}`}>
-        {mascot}
-        <div
-          className="hud-card"
-          data-mode={mode}
-          style={{ width }}
-          {...chromeProps}
-        >
-          <div key={mode} className="hud-card-body">
-            {children}
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (style === 'island') {
-    return (
-      <div className={`hud-stage is-island${rest ? ' is-rest' : ''}`}>
-        <div
-          className="hud-pill"
-          data-mode={mode}
-          style={{ width }}
-          {...chromeProps}
-        >
-          {mascot}
-          {rest ? null : (
-            <div key={mode} className="hud-body">
-              {children}
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className={`hud-stage is-pill${rest ? ' is-rest' : ''}`}>
-      {mascot}
-      <div
-        className="hud-pill"
-        data-mode={mode}
-        style={{ width: rest ? 0 : width }}
-        {...chromeProps}
-      >
-        {rest ? null : (
-          <div key={mode} className="hud-body">
-            {children}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-export function ReadyContent({
-  onStart,
-  hotkeyParts,
-}: {
-  onStart: () => void;
-  hotkeyParts: string[];
-}) {
-  const parts = hotkeyParts.length > 0 ? hotkeyParts : ['Cmd', 'Opt', 'T'];
-  return (
-    <>
-      <button type="button" className="hud-copy" data-no-drag onClick={onStart}>
-        <span className="hud-mic" aria-hidden>
-          <Mic size={14} strokeWidth={2.2} />
-        </span>
-        <span className="hud-label">{t('hud.pressToTalk')}</span>
-      </button>
-      <span className="hud-keys" aria-label={parts.join(' + ')}>
-        {parts.map(part => (
-          <kbd key={part} className="hud-key">
-            {part}
-          </kbd>
-        ))}
-      </span>
-    </>
-  );
-}
-
-export function ListeningContent({
-  audioLevel,
-  onStop,
-  onCancel,
-  variant = 'pill',
-}: {
-  audioLevel: number;
-  onStop: () => void;
-  onCancel: () => void;
-  variant?: 'pill' | 'island';
-}) {
-  return (
-    <>
-      <span className="hud-blush live" aria-hidden />
-      <WaveformVisualization audioLevel={audioLevel} bars={16} barWidth={2.5} />
-      {variant === 'pill' ? (
+  const renderSide = (items: OrbitalAction[], side: 'left' | 'right') => (
+    <div className={`hud-orbitals-side is-${side}`}>
+      {items.map((action, index) => (
         <button
+          key={action.id}
           type="button"
-          className="hud-cancel"
+          className={`hud-orbital is-${action.id}`}
           data-no-drag
-          aria-label={t('hud.cancel')}
-          onClick={onCancel}
+          tabIndex={visible ? 0 : -1}
+          style={{ '--hud-stagger': index } as CSSProperties}
+          aria-label={action.label}
+          title={action.label}
+          onClick={() => onAction(action.id)}
         >
-          <X size={14} strokeWidth={2.4} />
-        </button>
-      ) : null}
-      <button
-        type="button"
-        className={variant === 'island' ? 'hud-stop' : 'hud-confirm'}
-        data-no-drag
-        aria-label={t('hud.stop')}
-        onClick={onStop}
-      >
-        {variant === 'island' ? (
-          <Square size={10} fill="currentColor" strokeWidth={0} />
-        ) : (
-          <Check size={15} strokeWidth={2.6} />
-        )}
-      </button>
-    </>
-  );
-}
-
-export function ProcessingContent({ message }: { message?: string }) {
-  return (
-    <span className="hud-copy">
-      <span className="hud-label muted">
-        {translateBackendMessage(
-          message || 'status.processing',
-          'errors.status.processing'
-        )}
-      </span>
-    </span>
-  );
-}
-
-export function DoneContent() {
-  return (
-    <span className="hud-copy">
-      <span className="hud-label">{t('hud.done')}</span>
-    </span>
-  );
-}
-
-function ResultTimeout({ visible }: { visible?: boolean }) {
-  if (!visible) return null;
-  return (
-    <span className="hud-timeout hud-timeout-result" aria-hidden>
-      <span className="hud-timeout-bar" />
-    </span>
-  );
-}
-
-export function TranscribedContent({
-  text,
-  onInsert,
-  onOpenActions,
-  onClose,
-  showTimeout,
-}: {
-  text: string;
-  onInsert: () => void;
-  onOpenActions: () => void;
-  onClose: () => void;
-  showTimeout?: boolean;
-}) {
-  return (
-    <>
-      <span className="hud-text" title={text}>
-        {text}
-      </span>
-      <button
-        type="button"
-        className="hud-insert"
-        data-no-drag
-        aria-label={t('hud.insert')}
-        onClick={onInsert}
-      >
-        <Play size={14} fill="currentColor" />
-      </button>
-      <button
-        type="button"
-        className="hud-icon-btn"
-        data-no-drag
-        aria-label={t('hud.moreActions')}
-        onClick={onOpenActions}
-      >
-        <MoreHorizontal size={16} />
-      </button>
-      <button
-        type="button"
-        className="hud-cancel"
-        data-no-drag
-        aria-label={t('hud.close')}
-        onClick={onClose}
-      >
-        <X size={14} strokeWidth={2.4} />
-      </button>
-      <ResultTimeout visible={showTimeout} />
-    </>
-  );
-}
-
-export function ActionsContent({
-  text,
-  menuOpen,
-  onCopy,
-  onImprove,
-  onToggleMenu,
-  onClose,
-  showTimeout,
-}: {
-  text: string;
-  menuOpen: boolean;
-  onCopy: () => void;
-  onImprove: () => void;
-  onToggleMenu: () => void;
-  onClose: () => void;
-  showTimeout?: boolean;
-}) {
-  return (
-    <>
-      <span className="hud-text" title={text}>
-        {text}
-      </span>
-      <button type="button" className="hud-btn" data-no-drag onClick={onCopy}>
-        <Copy size={13} strokeWidth={2.2} />
-        {t('hud.copy')}
-      </button>
-      <button
-        type="button"
-        className="hud-btn hud-btn-ghost"
-        data-no-drag
-        onClick={onImprove}
-      >
-        <Sparkles size={13} strokeWidth={2.2} />
-        {t('hud.improve')}
-      </button>
-      <button
-        type="button"
-        className="hud-icon-btn"
-        data-no-drag
-        aria-label={t('hud.quickMenu')}
-        aria-expanded={menuOpen}
-        onClick={onToggleMenu}
-      >
-        <MoreHorizontal size={16} />
-      </button>
-      <button
-        type="button"
-        className="hud-cancel"
-        data-no-drag
-        aria-label={t('hud.close')}
-        onClick={onClose}
-      >
-        <X size={14} strokeWidth={2.4} />
-      </button>
-      <ResultTimeout visible={showTimeout} />
-    </>
-  );
-}
-
-export function CompactContent({
-  onStop,
-}: {
-  audioLevel?: number;
-  onStop: () => void;
-  onCancel?: () => void;
-}) {
-  return (
-    <>
-      <span className="hud-mic" aria-hidden>
-        <Mic size={14} strokeWidth={2.2} />
-      </span>
-      <span className="hud-label">{t('hud.dictating')}</span>
-      <button
-        type="button"
-        className="hud-stop"
-        data-no-drag
-        aria-label={t('hud.stop')}
-        onClick={onStop}
-      >
-        <Square size={10} fill="currentColor" strokeWidth={0} />
-      </button>
-    </>
-  );
-}
-
-function CardFrame({
-  title,
-  subtitle,
-  onClose,
-  children,
-}: {
-  title: string;
-  subtitle?: string;
-  onClose?: () => void;
-  children?: ReactNode;
-}) {
-  return (
-    <div className="hud-card-frame">
-      <div className="hud-card-heading">
-        <div className="hud-card-heading-row">
-          <h2>{title}</h2>
-          {onClose ? (
-            <button
-              type="button"
-              className="hud-card-close"
-              data-no-drag
-              aria-label={t('hud.close')}
-              onClick={onClose}
-            >
-              <X size={14} strokeWidth={2.4} />
-            </button>
-          ) : null}
-        </div>
-        {subtitle ? <p>{subtitle}</p> : null}
-      </div>
-      {children}
-    </div>
-  );
-}
-
-function CardChips({
-  items,
-}: {
-  items: Array<{ label: string; onClick: () => void }>;
-}) {
-  return (
-    <div className="hud-card-chips">
-      {items.map(item => (
-        <button
-          key={item.label}
-          type="button"
-          className="hud-card-chip"
-          data-no-drag
-          onClick={item.onClick}
-        >
-          {item.label}
+          {action.icon}
         </button>
       ))}
     </div>
   );
-}
-
-export function CardReadyContent({
-  onStart,
-  hotkeyParts,
-  onNotes,
-  onEmail,
-  onIdea,
-  onMore,
-  onSettings,
-}: {
-  onStart: () => void;
-  hotkeyParts: string[];
-  onNotes: () => void;
-  onEmail: () => void;
-  onIdea: () => void;
-  onMore: () => void;
-  onSettings: () => void;
-}) {
-  const parts = hotkeyParts.length > 0 ? hotkeyParts : ['Cmd', 'Space'];
-  return (
-    <CardFrame title={t('common.brand')} subtitle={t('nav.tagline')}>
-      <button
-        type="button"
-        className="hud-card-cta"
-        data-no-drag
-        onClick={onStart}
-      >
-        <span className="hud-mic" aria-hidden>
-          <Mic size={14} strokeWidth={2.2} />
-        </span>
-        <span className="hud-label">
-          {t('hud.pressParts', { parts: parts.join(' ') })}
-        </span>
-      </button>
-      <div className="hud-card-idle-row">
-        <CardChips
-          items={[
-            { label: t('hud.chipNote'), onClick: onNotes },
-            { label: t('hud.chipEmail'), onClick: onEmail },
-            { label: t('hud.chipIdea'), onClick: onIdea },
-            { label: t('hud.chipMore'), onClick: onMore },
-          ]}
-        />
-        <button
-          type="button"
-          className="hud-card-gear"
-          data-no-drag
-          aria-label={t('hud.controls')}
-          onClick={onSettings}
-        >
-          <Settings size={14} strokeWidth={2.2} />
-        </button>
-      </div>
-    </CardFrame>
-  );
-}
-
-export function CardListeningContent({
-  audioLevel,
-  onStop,
-  onCancel,
-}: {
-  audioLevel: number;
-  onStop: () => void;
-  onCancel: () => void;
-}) {
-  return (
-    <CardFrame title={t('hud.listening')} subtitle={t('hud.voiceForms')}>
-      <div className="hud-card-wave">
-        <WaveformVisualization audioLevel={audioLevel} bars={22} barWidth={3} />
-      </div>
-      <button
-        type="button"
-        className="hud-card-stop"
-        data-no-drag
-        aria-label={t('hud.stop')}
-        onClick={onStop}
-      >
-        <Square size={12} fill="currentColor" strokeWidth={0} />
-      </button>
-      <button
-        type="button"
-        className="hud-card-hint"
-        data-no-drag
-        onClick={onCancel}
-      >
-        {t('hud.pressEsc')}
-      </button>
-    </CardFrame>
-  );
-}
-
-function processSteps(): string[] {
-  return [
-    t('hud.transcribing'),
-    t('hud.improving'),
-    t('hud.detecting'),
-    t('hud.almost'),
-  ];
-}
-
-export function CardProcessingContent({ message }: { message?: string }) {
-  const [step, setStep] = useState(0);
-  const steps = processSteps();
-  useEffect(() => {
-    const timer = window.setInterval(() => {
-      setStep(current => Math.min(current + 1, steps.length - 1));
-    }, 700);
-    return () => window.clearInterval(timer);
-  }, [steps.length]);
 
   return (
-    <CardFrame
-      title={t('hud.processing')}
-      subtitle={
-        translateBackendMessage(
-          message || 'status.processing',
-          'errors.status.processing'
-        ) || t('hud.organizing')
-      }
+    <div
+      className={`hud-orbitals${visible ? ' is-visible' : ''}`}
+      data-hud-hit=""
+      aria-hidden={!visible}
     >
-      <span className="hud-card-orb" aria-hidden />
-      <ul className="hud-card-checklist">
-        {steps.map((label, index) => (
-          <li key={index} className={index <= step ? 'is-done' : undefined}>
-            <span aria-hidden>{index <= step ? '✓' : '○'}</span>
-            {label}
-          </li>
-        ))}
-      </ul>
-    </CardFrame>
+      {renderSide(left, 'left')}
+      {renderSide(right, 'right')}
+    </div>
   );
 }
 
-export function CardDoneContent() {
-  return <CardFrame title={t('hud.done')} subtitle={t('hud.aMoment')} />;
-}
-
-export function CardTranscribedContent({
-  text,
-  onInsert,
-  onCopy,
-  onImprove,
-  onSummarize,
-  onTranslate,
-  onOpenActions,
-  onClose,
-  showTimeout,
+/** Hover actions: one per side, so each slides straight out from behind the mascot. */
+export function ReadyOrbitals({
+  visible,
+  onAction,
 }: {
-  text: string;
-  onInsert: () => void;
-  onCopy: () => void;
-  onImprove: () => void;
-  onSummarize: () => void;
-  onTranslate: () => void;
-  onOpenActions: () => void;
-  onClose: () => void;
-  showTimeout?: boolean;
+  visible: boolean;
+  onAction: (id: OrbitalActionId) => void;
 }) {
   return (
-    <CardFrame
-      title={t('hud.done')}
-      subtitle={t('hud.whatNext')}
-      onClose={onClose}
+    <HudOrbitalActions
+      visible={visible}
+      onAction={onAction}
+      left={[
+        {
+          id: 'dictate',
+          label: t('hud.dictate'),
+          icon: <Mic size={15} strokeWidth={2.2} />,
+        },
+      ]}
+      right={[
+        {
+          id: 'more',
+          label: t('hud.moreActions'),
+          icon: <MoreHorizontal size={15} strokeWidth={2.2} />,
+        },
+      ]}
+    />
+  );
+}
+
+export function ListeningOrbitals({
+  visible,
+  onAction,
+}: {
+  visible: boolean;
+  onAction: (id: OrbitalActionId) => void;
+}) {
+  return (
+    <HudOrbitalActions
+      visible={visible}
+      onAction={onAction}
+      left={[
+        {
+          id: 'cancel',
+          label: t('hud.cancel'),
+          icon: <X size={14} strokeWidth={2.4} />,
+        },
+      ]}
+      right={[
+        {
+          id: 'stop',
+          label: t('hud.stop'),
+          icon: <Square size={10} fill="currentColor" strokeWidth={0} />,
+        },
+      ]}
+    />
+  );
+}
+
+/**
+ * Stage: a box whose geometric center is the mascot center.
+ * Orbitals and the status toast are absolutely positioned around it,
+ * so nothing ever pushes the mascot.
+ */
+export function HudStage({
+  mode,
+  width,
+  height,
+  covered,
+  mascot,
+  orbitals,
+  toast,
+  onMouseDown,
+  onPointerEnter,
+  onPointerLeave,
+}: {
+  mode: HudMode;
+  width: number;
+  height: number;
+  covered: boolean;
+  mascot: ReactNode;
+  orbitals?: ReactNode;
+  toast?: ReactNode;
+  onMouseDown?: MouseEventHandler<HTMLDivElement>;
+  onPointerEnter?: PointerEventHandler<HTMLDivElement>;
+  onPointerLeave?: PointerEventHandler<HTMLDivElement>;
+}) {
+  return (
+    <div
+      className={`hud-stage is-${mode}${covered ? ' is-covered' : ''}`}
+      data-mode={mode}
+      data-hud-hit=""
+      style={{ width, height }}
+      onMouseDown={onMouseDown}
+      onPointerEnter={onPointerEnter}
+      onPointerLeave={onPointerLeave}
     >
-      <p className="hud-card-quote" title={text}>
-        {text}
-      </p>
-      <div className="hud-card-row">
-        <button
-          type="button"
-          className="hud-insert hud-insert-label"
-          data-no-drag
-          onClick={onInsert}
-        >
-          {t('hud.insert')}
-        </button>
-        <button type="button" className="hud-btn" data-no-drag onClick={onCopy}>
-          <Copy size={13} strokeWidth={2.2} />
-          {t('hud.copy')}
-        </button>
+      <div className="hud-stage-toast">{toast}</div>
+      <div className="hud-stage-core">
+        {orbitals}
+        {mascot}
       </div>
-      <CardChips
-        items={[
-          { label: t('hud.improve'), onClick: onImprove },
-          { label: t('hud.summarize'), onClick: onSummarize },
-          { label: t('hud.translate'), onClick: onTranslate },
-          { label: t('hud.chipMore'), onClick: onOpenActions },
-        ]}
-      />
-      <ResultTimeout visible={showTimeout} />
-    </CardFrame>
+    </div>
   );
 }
 
-export function CardActionsContent({
-  text,
-  onInsert,
-  onCopy,
-  onImprove,
-  onClose,
-  showTimeout,
-}: {
-  text: string;
-  onInsert: () => void;
-  onCopy: () => void;
-  onImprove: () => void;
-  onClose: () => void;
-  showTimeout?: boolean;
-}) {
-  return (
-    <CardFrame
-      title={t('hud.actions')}
-      subtitle={t('hud.adjustBefore')}
-      onClose={onClose}
-    >
-      <p className="hud-card-quote" title={text}>
-        {text}
-      </p>
-      <div className="hud-card-row">
-        <button
-          type="button"
-          className="hud-insert hud-insert-label"
-          data-no-drag
-          onClick={onInsert}
-        >
-          {t('hud.insert')}
-        </button>
-        <button type="button" className="hud-btn" data-no-drag onClick={onCopy}>
-          <Copy size={13} strokeWidth={2.2} />
-          {t('hud.copy')}
-        </button>
-        <button
-          type="button"
-          className="hud-btn hud-btn-ghost"
-          data-no-drag
-          onClick={onImprove}
-        >
-          <Sparkles size={13} strokeWidth={2.2} />
-          {t('hud.improve')}
-        </button>
-      </div>
-      <ResultTimeout visible={showTimeout} />
-    </CardFrame>
-  );
-}
-
-export function CardMenuContent({
-  hotkeyParts,
-  onDictate,
-  onNotes,
-  onEmail,
-  onIdea,
-  onList,
-  onTranslate,
-  onMore,
-  onClose,
-}: {
-  hotkeyParts: string[];
-  onDictate: () => void;
-  onNotes: () => void;
-  onEmail: () => void;
-  onIdea: () => void;
-  onList: () => void;
-  onTranslate: () => void;
-  onMore: () => void;
-  onClose: () => void;
-}) {
-  const shortcut = hotkeyParts.length > 0 ? hotkeyParts.join('') : '⌘Space';
-  return (
-    <CardFrame title={t('hud.actions')} onClose={onClose}>
-      <div className="hud-card-menu" role="menu">
-        <button type="button" role="menuitem" data-no-drag onClick={onDictate}>
-          <span>{t('hud.dictate')}</span>
-          <kbd>{shortcut}</kbd>
-        </button>
-        <button type="button" role="menuitem" data-no-drag onClick={onNotes}>
-          {t('hud.takeNote')}
-        </button>
-        <button type="button" role="menuitem" data-no-drag onClick={onEmail}>
-          {t('hud.writeEmail')}
-        </button>
-        <button type="button" role="menuitem" data-no-drag onClick={onIdea}>
-          {t('hud.developIdea')}
-        </button>
-        <button type="button" role="menuitem" data-no-drag onClick={onList}>
-          {t('hud.makeList')}
-        </button>
-        <button
-          type="button"
-          role="menuitem"
-          data-no-drag
-          onClick={onTranslate}
-        >
-          {t('hud.translate')}
-        </button>
-        <button type="button" role="menuitem" data-no-drag onClick={onMore}>
-          {t('hud.moreActionsEllipsis')}
-        </button>
-      </div>
-    </CardFrame>
-  );
-}
-
-export function CardHistoryContent({
-  items,
-  query,
-  onQueryChange,
-  onOpenAll,
-  onSelect,
-  onClose,
-  formatTime,
-}: {
-  items: HudHistoryItem[];
-  query: string;
-  onQueryChange: (value: string) => void;
-  onOpenAll: () => void;
-  onSelect: (item: HudHistoryItem) => void;
-  onClose: () => void;
-  formatTime: (createdAt: string) => string;
-}) {
-  const filtered = items.filter(item =>
-    item.text.toLowerCase().includes(query.trim().toLowerCase())
-  );
-  return (
-    <CardFrame title={t('hud.recent')} onClose={onClose}>
-      <label className="hud-card-search">
-        <Search size={14} strokeWidth={2.2} />
-        <input
-          data-no-drag
-          value={query}
-          onChange={event => onQueryChange(event.target.value)}
-          placeholder={t('hud.search')}
-        />
-      </label>
-      <ul className="hud-card-history">
-        {filtered.length === 0 ? (
-          <li className="is-empty">{t('hud.noMurmullos')}</li>
-        ) : (
-          filtered.slice(0, 3).map(item => (
-            <li key={item.id}>
-              <button type="button" data-no-drag onClick={() => onSelect(item)}>
-                <span>{item.text}</span>
-                <small>{formatTime(item.created_at)}</small>
-              </button>
-            </li>
-          ))
-        )}
-      </ul>
-      <button
-        type="button"
-        className="hud-card-more"
-        data-no-drag
-        onClick={onOpenAll}
-      >
-        {t('hud.seeAll')}
-      </button>
-    </CardFrame>
-  );
-}
-
-export function CardControlsContent({
-  modelLabel,
-  languageLabel,
-  autoInsert,
-  onToggleAutoInsert,
-  onShortcuts,
-  onSettings,
-  onClose,
-}: {
-  modelLabel: string;
-  languageLabel: string;
-  autoInsert: boolean;
-  onToggleAutoInsert: (next: boolean) => void;
-  onShortcuts: () => void;
-  onSettings: () => void;
-  onClose: () => void;
-}) {
-  return (
-    <CardFrame title={t('hud.controls')} onClose={onClose}>
-      <div className="hud-card-controls">
-        <div className="hud-card-control">
-          <span>{t('hud.model')}</span>
-          <strong>{modelLabel}</strong>
-        </div>
-        <div className="hud-card-control">
-          <span>{t('hud.language')}</span>
-          <strong>{languageLabel}</strong>
-        </div>
-        <label className="hud-card-control">
-          <span>{t('hud.autoInsert')}</span>
-          <input
-            type="checkbox"
-            data-no-drag
-            checked={autoInsert}
-            onChange={event => onToggleAutoInsert(event.target.checked)}
-          />
-        </label>
-        <button
-          type="button"
-          className="hud-card-control is-button"
-          data-no-drag
-          onClick={onShortcuts}
-        >
-          <span>
-            <Keyboard size={14} strokeWidth={2.2} />
-            {t('hud.shortcuts')}
-          </span>
-          <strong>⌘K</strong>
-        </button>
-        <button
-          type="button"
-          className="hud-card-control is-button"
-          data-no-drag
-          onClick={onSettings}
-        >
-          {t('common.settings')}
-        </button>
-      </div>
-    </CardFrame>
-  );
-}
-
-export function CardCancelledContent({
-  onUndo,
-  reducedMotion,
-}: {
-  onUndo: () => void;
-  reducedMotion: boolean;
-}) {
-  return (
-    <CardFrame title={t('hud.cancelledTitle')} subtitle={t('hud.notSaved')}>
-      <button type="button" className="hud-btn" data-no-drag onClick={onUndo}>
-        {t('hud.undo')}
-      </button>
-      {reducedMotion ? null : (
-        <span className="hud-timeout" aria-hidden>
-          <span className="hud-timeout-bar" />
-        </span>
-      )}
-    </CardFrame>
-  );
-}
-
-export function CardErrorContent({
-  message,
-  onClose,
-  onOpenApp,
-}: {
-  message: string;
-  onClose: () => void;
-  onOpenApp?: () => void;
-}) {
-  return (
-    <CardFrame title={t('common.genericError')} subtitle={message}>
-      <div className="hud-card-row">
-        {onOpenApp ? (
-          <button
-            type="button"
-            className="hud-btn"
-            data-no-drag
-            onClick={onOpenApp}
-          >
-            {t('hud.open')}
-          </button>
-        ) : null}
-        <button
-          type="button"
-          className="hud-cancel"
-          data-no-drag
-          aria-label={t('hud.close')}
-          onClick={onClose}
-        >
-          <X size={14} strokeWidth={2.4} />
-        </button>
-      </div>
-    </CardFrame>
-  );
-}
-
-export function ErrorContent({
-  message,
-  onClose,
-  onOpenApp,
-}: {
-  message: string;
-  onClose: () => void;
-  onOpenApp?: () => void;
-}) {
-  return (
-    <>
-      <span className="hud-copy">
-        <span className="hud-label">{message}</span>
-      </span>
-      {onOpenApp ? (
-        <button
-          type="button"
-          className="hud-btn"
-          data-no-drag
-          onClick={onOpenApp}
-        >
-          {t('hud.open')}
-        </button>
-      ) : null}
-      <button
-        type="button"
-        className="hud-cancel"
-        data-no-drag
-        aria-label={t('hud.close')}
-        onClick={onClose}
-      >
-        <X size={14} strokeWidth={2.4} />
-      </button>
-    </>
-  );
-}
-
-export function CancelledContent({
-  onUndo,
-  reducedMotion,
-}: {
-  onUndo: () => void;
-  reducedMotion: boolean;
-}) {
-  return (
-    <>
-      <span className="hud-label">{t('hud.cancelled')}</span>
-      <button type="button" className="hud-btn" data-no-drag onClick={onUndo}>
-        {t('hud.undo')}
-      </button>
-      {reducedMotion ? null : (
-        <span className="hud-timeout" aria-hidden>
-          <span className="hud-timeout-bar" />
-        </span>
-      )}
-    </>
-  );
-}
-
+/** Keeps children mounted for the leave transition. */
 export function HudLayer({
   open,
   reducedMotion,
@@ -1047,7 +291,7 @@ export function HudLayer({
       setPresent(false);
       return undefined;
     }
-    const timer = window.setTimeout(() => setPresent(false), 200);
+    const timer = window.setTimeout(() => setPresent(false), 220);
     return () => window.clearTimeout(timer);
   }, [open, reducedMotion]);
 
@@ -1066,36 +310,303 @@ export function HudLayer({
 export function HudToast({
   message,
   kind = 'insert',
+  spinner = false,
 }: {
   message: string;
   kind?: HudNoticeKind;
+  spinner?: boolean;
 }) {
   return (
     <div className={`hud-toast${kind === 'error' ? ' is-error' : ''}`}>
-      {message}
+      {spinner ? (
+        <span className="hud-spinner" aria-hidden />
+      ) : (
+        <Check size={13} strokeWidth={2.6} aria-hidden />
+      )}
+      <span>{message}</span>
     </div>
   );
 }
 
+export function ProcessingToast({ message }: { message?: string }) {
+  return (
+    <HudToast
+      spinner
+      message={translateBackendMessage(
+        message || 'status.processing',
+        'errors.status.processing'
+      )}
+    />
+  );
+}
+
+/**
+ * A panel centered on the mascot that covers the stage like a modal.
+ * It measures itself and shifts inside the window so it never leaves the
+ * work area; the mascot underneath never moves.
+ */
+export function HudPanel({
+  open,
+  kind,
+  mascot,
+  work,
+  reducedMotion,
+  children,
+}: {
+  open: boolean;
+  kind: HudPanelKind | null;
+  mascot: HudPoint | null;
+  work: OverlayWorkArea | null;
+  reducedMotion: boolean;
+  children: ReactNode;
+}) {
+  const [present, setPresent] = useState(open);
+  const [shift, setShift] = useState<HudPoint>({ x: 0, y: 0 });
+  const cached = useRef(children);
+  const boxRef = useRef<HTMLDivElement | null>(null);
+  if (open && children) cached.current = children;
+
+  useEffect(() => {
+    if (open) {
+      setPresent(true);
+      return undefined;
+    }
+    if (reducedMotion) {
+      setPresent(false);
+      return undefined;
+    }
+    const timer = window.setTimeout(() => setPresent(false), 220);
+    return () => window.clearTimeout(timer);
+  }, [open, reducedMotion]);
+
+  useLayoutEffect(() => {
+    const box = boxRef.current;
+    if (!box || !present) return undefined;
+    const measure = () => {
+      if (!mascot || !work) {
+        setShift({ x: 0, y: 0 });
+        return;
+      }
+      const rect = box.getBoundingClientRect();
+      const next = panelShift(
+        mascot,
+        { width: rect.width, height: rect.height },
+        work
+      );
+      setShift(current =>
+        current.x === next.x && current.y === next.y ? current : next
+      );
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(box);
+    return () => observer.disconnect();
+  }, [present, mascot, work, kind]);
+
+  if (!present) return null;
+  return (
+    <div
+      ref={boxRef}
+      className={`hud-panel is-${kind ?? 'none'}${open ? ' is-open' : ' is-leaving'}`}
+      style={
+        {
+          '--hud-shift-x': `${shift.x}px`,
+          '--hud-shift-y': `${shift.y}px`,
+        } as CSSProperties
+      }
+      data-no-drag
+      data-hud-hit=""
+    >
+      {open ? children : cached.current}
+    </div>
+  );
+}
+
+function ResultTimeout({ visible }: { visible?: boolean }) {
+  if (!visible) return null;
+  return (
+    <span className="hud-timeout hud-timeout-result" aria-hidden>
+      <span className="hud-timeout-bar" />
+    </span>
+  );
+}
+
+export function ResultPanel({
+  text,
+  onInsert,
+  onCopy,
+  onEdit,
+  onClose,
+  showTimeout,
+}: {
+  text: string;
+  onInsert: () => void;
+  onCopy: () => void;
+  onEdit: () => void;
+  onClose: () => void;
+  showTimeout?: boolean;
+}) {
+  return (
+    <div className="hud-card is-result" role="dialog" aria-modal="true">
+      <p className="hud-card-result" title={text}>
+        {text}
+      </p>
+      <div className="hud-card-actions">
+        <button
+          type="button"
+          className="hud-insert"
+          data-no-drag
+          onClick={onInsert}
+        >
+          {t('hud.insertEnter')}
+        </button>
+        <button
+          type="button"
+          className="hud-icon-btn"
+          data-no-drag
+          aria-label={t('hud.copy')}
+          onClick={onCopy}
+        >
+          <Copy size={14} strokeWidth={2.2} />
+        </button>
+        <button
+          type="button"
+          className="hud-icon-btn"
+          data-no-drag
+          aria-label={t('hud.edit')}
+          onClick={onEdit}
+        >
+          <Pencil size={14} strokeWidth={2.2} />
+        </button>
+        <button
+          type="button"
+          className="hud-icon-btn"
+          data-no-drag
+          aria-label={t('hud.close')}
+          onClick={onClose}
+        >
+          <X size={14} strokeWidth={2.4} />
+        </button>
+      </div>
+      <ResultTimeout visible={showTimeout} />
+    </div>
+  );
+}
+
+export function CancelledPanel({
+  onUndo,
+  onClose,
+  reducedMotion,
+}: {
+  onUndo: () => void;
+  onClose: () => void;
+  reducedMotion: boolean;
+}) {
+  return (
+    <div className="hud-card is-notice" role="status">
+      <p className="hud-card-text">{t('hud.cancelled')}</p>
+      <div className="hud-card-actions">
+        <button type="button" className="hud-btn" data-no-drag onClick={onUndo}>
+          {t('hud.undo')}
+        </button>
+        <button
+          type="button"
+          className="hud-icon-btn"
+          data-no-drag
+          aria-label={t('hud.close')}
+          onClick={onClose}
+        >
+          <X size={14} strokeWidth={2.4} />
+        </button>
+      </div>
+      {reducedMotion ? null : (
+        <span className="hud-timeout" aria-hidden>
+          <span className="hud-timeout-bar is-cancel" />
+        </span>
+      )}
+    </div>
+  );
+}
+
+export function ErrorPanel({
+  message,
+  onClose,
+  onOpenApp,
+}: {
+  message: string;
+  onClose: () => void;
+  onOpenApp?: () => void;
+}) {
+  return (
+    <div className="hud-card is-error" role="alertdialog" aria-modal="true">
+      <p className="hud-card-text">{message}</p>
+      <div className="hud-card-actions">
+        {onOpenApp ? (
+          <button
+            type="button"
+            className="hud-btn"
+            data-no-drag
+            onClick={onOpenApp}
+          >
+            {t('hud.open')}
+          </button>
+        ) : null}
+        <button
+          type="button"
+          className="hud-icon-btn"
+          data-no-drag
+          aria-label={t('hud.close')}
+          onClick={onClose}
+        >
+          <X size={14} strokeWidth={2.4} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+const ANCHOR_ITEMS: Array<{
+  id: Exclude<OverlayAnchor, 'custom'>;
+  labelKey:
+    'hud.anchorTop' | 'hud.anchorBottom' | 'hud.anchorLeft' | 'hud.anchorRight';
+  icon: ReactNode;
+}> = [
+  { id: 'top', labelKey: 'hud.anchorTop', icon: <ArrowUp size={14} /> },
+  { id: 'bottom', labelKey: 'hud.anchorBottom', icon: <ArrowDown size={14} /> },
+  { id: 'left', labelKey: 'hud.anchorLeft', icon: <ArrowLeft size={14} /> },
+  { id: 'right', labelKey: 'hud.anchorRight', icon: <ArrowRight size={14} /> },
+];
+
 export function HudQuickMenu({
-  compact,
-  showCompactToggle = true,
+  anchor,
   onOpenApp,
   onLastMurmur,
   onSettings,
-  onToggleCompact,
+  onAnchor,
   onExit,
+  onClose,
 }: {
-  compact: boolean;
-  showCompactToggle?: boolean;
+  anchor: OverlayAnchor;
   onOpenApp: () => void;
   onLastMurmur: () => void;
   onSettings: () => void;
-  onToggleCompact: () => void;
+  onAnchor: (anchor: Exclude<OverlayAnchor, 'custom'>) => void;
   onExit: () => void;
+  onClose: () => void;
 }) {
   return (
     <div className="hud-menu" role="menu">
+      <div className="hud-menu-head">
+        <span className="hud-menu-title">{t('hud.quickMenu')}</span>
+        <button
+          type="button"
+          className="hud-icon-btn is-small"
+          aria-label={t('hud.close')}
+          onClick={onClose}
+        >
+          <X size={13} strokeWidth={2.4} />
+        </button>
+      </div>
       <button type="button" role="menuitem" onClick={onOpenApp}>
         {t('hud.openApp')}
       </button>
@@ -1105,16 +616,29 @@ export function HudQuickMenu({
       <button type="button" role="menuitem" onClick={onSettings}>
         {t('common.settings')}
       </button>
-      {showCompactToggle ? (
-        <button
-          type="button"
-          role="menuitemcheckbox"
-          aria-checked={compact}
-          onClick={onToggleCompact}
-        >
-          {compact ? t('hud.fullBar') : t('hud.compactMode')}
-        </button>
-      ) : null}
+      <div className="hud-menu-sep" />
+      <div className="hud-menu-label">{t('hud.position')}</div>
+      <div
+        className="hud-menu-anchors"
+        role="group"
+        aria-label={t('hud.position')}
+      >
+        {ANCHOR_ITEMS.map(item => (
+          <button
+            key={item.id}
+            type="button"
+            role="menuitemradio"
+            aria-checked={anchor === item.id}
+            className={anchor === item.id ? 'is-active' : undefined}
+            aria-label={t(item.labelKey)}
+            title={t(item.labelKey)}
+            onClick={() => onAnchor(item.id)}
+          >
+            {item.icon}
+            <span>{t(item.labelKey)}</span>
+          </button>
+        ))}
+      </div>
       <div className="hud-menu-sep" />
       <button type="button" className="danger" role="menuitem" onClick={onExit}>
         {t('hud.quit')}

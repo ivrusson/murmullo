@@ -134,6 +134,9 @@ pub struct UiConfig {
     pub overlay_x: Option<f64>,
     #[serde(default)]
     pub overlay_y: Option<f64>,
+    /// Cardinal screen edge (`top`/`bottom`/`left`/`right`) or `custom` after free drag.
+    #[serde(default = "default_overlay_anchor")]
+    pub overlay_anchor: String,
     #[serde(default)]
     pub overlay_compact: bool,
     #[serde(default = "default_overlay_style")]
@@ -153,6 +156,7 @@ impl Default for UiConfig {
             selected_model: None,
             overlay_x: None,
             overlay_y: None,
+            overlay_anchor: default_overlay_anchor(),
             overlay_compact: false,
             overlay_style: default_overlay_style(),
             auto_insert: true,
@@ -167,8 +171,19 @@ fn default_ui_lang() -> String {
     "es".to_string()
 }
 
+fn default_overlay_anchor() -> String {
+    "bottom".to_string()
+}
+
 fn default_overlay_style() -> String {
     "pill".to_string()
+}
+
+pub fn normalize_overlay_anchor(value: &str) -> String {
+    match value {
+        "top" | "bottom" | "left" | "right" | "custom" => value.to_string(),
+        _ => default_overlay_anchor(),
+    }
 }
 
 pub fn normalize_overlay_style(value: &str) -> String {
@@ -192,6 +207,7 @@ impl Default for AppConfig {
                 selected_model: Some("parakeet-tdt-0.6b-v3-q8".to_string()),
                 overlay_x: None,
                 overlay_y: None,
+                overlay_anchor: default_overlay_anchor(),
                 overlay_compact: false,
                 overlay_style: default_overlay_style(),
                 auto_insert: true,
@@ -289,6 +305,10 @@ impl AppConfig {
     pub fn update_overlay_position(&mut self, x: f64, y: f64) {
         self.ui.overlay_x = Some(x);
         self.ui.overlay_y = Some(y);
+    }
+
+    pub fn update_overlay_anchor(&mut self, anchor: String) {
+        self.ui.overlay_anchor = normalize_overlay_anchor(&anchor);
     }
 
     pub fn update_overlay_compact(&mut self, compact: bool) {
