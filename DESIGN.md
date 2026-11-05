@@ -202,17 +202,23 @@ The type system balances geometric clarity with literary warmth.
 
 ## Layout & Spacing
 
-The layout is built around two primary viewport scenarios: **The macOS Companion Island (Floating
-Overlay)** and **The Main Workstation Canvas**.
+The layout is built around two primary viewport scenarios: **The macOS Presence Overlay (floating
+mascot)** and **The Main Workstation Canvas**.
 
-### 1. macOS Floating Dynamic Bar / Island
+### 1. macOS Presence Overlay (mascot + orbitals + panels)
 
-- A detached, self-centering floating capsule that hovers above the user's active application (code
-  editor, browser, notes).
-- Height maintains a default of `56px` to `64px`, expanding horizontally from compact listening mode
-  (`180px`) up to transcribed preview mode (`460px`).
-- Internal element spacing adheres to `space-sm` (8px) between micro-controls and `space-md` (16px)
-  separating the companion entity avatar from live transcription preview.
+- A detached floating mascot that hovers above the user's active application (code editor, browser,
+  notes). At rest only the mascot (96px) is visible.
+- The mascot center is the only anchor. The native window is always symmetric around it, in every
+  state, so the mascot never moves when the overlay grows or shrinks. Panels shift inside the window
+  to stay on screen; the mascot does not.
+- On hover, one orbital action per side (dictate, more) slides out from behind the mascot. While
+  listening the pair becomes cancel / stop. Processing and done show a small pill toast above the
+  mascot.
+- Results, errors, cancellations, the edit form, and the quick menu are centered panels that cover
+  the mascot like a modal; closing one leaves the mascot in place underneath.
+- Screen edge can be snapped from the overlay menu (top / bottom / left / right); free drag remains
+  available and becomes a custom position.
 
 ### 2. Main Workstation App Canvas
 
@@ -255,8 +261,8 @@ The design system adopts a **Level 3 (Pill-shaped & Ultra-Curved)** visual form 
 corners and aggressive angles are deliberately avoided to maintain an organic, tactile, and
 protective feel.
 
-- **Floating Bars & HUDs:** Full capsule geometry (`border-radius: 9999px` / `radius.pill`) for
-  floating dictation widgets, quick action buttons, and keyboard chips.
+- **Floating presence & HUDs:** Circular orbital action buttons (`border-radius: 9999px`) and soft
+  rounded speech bubbles (~18px) for status/results; keyboard chips stay pill-shaped.
 - **Surface Cards & Flyouts:** `radius.xl` (24px) to `32px`, creating squircle-like window
   containers consistent with modern macOS aesthetic guidelines.
 - **Nested Controls:** Inner elements strictly obey concentric curvature rules: a container of
@@ -265,15 +271,19 @@ protective feel.
 
 ## Components
 
-### 1. The Floating Companion Bar
+### 1. The Floating Presence (mascot)
 
-- **Base Style:** Capsule pill floating in absolute window coordinates. Backed by frosted white
-  acrylic (`rgba(255, 255, 255, 0.88)`), surrounded by a micro-border `rgba(255, 255, 255, 0.7)` and
-  Level 3 ambient shadow.
-- **Avatar Anchor:** The companion sprite sits slightly overflowing the capsule perimeter, reacting
-  with micro-squash-and-stretch upon audio input.
-- **Waveform Area:** Minimalist vertical sound equalizer bars (`width: 2.5px`,
-  `border-radius: 9999px`, color: `rgba(28, 26, 25, 0.35)` with real-time reactive height).
+- **Base Style:** The dark cloud mascot is the interface. No permanent glass capsule at rest. The
+  mascot floats, so it has a centered violet glow rather than a dropped shadow; the glow pulses blue
+  while listening and violet while processing; soft scale on hover.
+- **Orbital Actions:** Dark semi-transparent circular buttons (36px), one per side (dictate, more;
+  cancel, stop while listening). They start hidden behind the mascot and slide straight out to their
+  slot; leaving reverses the path. Tooltips on hold; no permanent labels.
+- **Panels:** Warm light surface, high-contrast text, centered soft glow, 18px radius. Centered on
+  the mascot and clamped to the work area. Host the result preview with Insert / Copy / Edit /
+  Close, the edit form, errors, cancellation with undo, and the quick menu.
+- **Status Toast:** Small pill above the mascot for processing (spinner) and done / inserted
+  confirmations. Never pushes the mascot.
 
 ### 2. Buttons & Triggers
 

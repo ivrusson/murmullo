@@ -1,6 +1,6 @@
 [package]
 name = "murmullo"
-version = "0.9.0"
+version = "0.10.0"
 description = "Murmullo - Offline Voice Dictation"
 authors = ["Iván Subsierra"]
 edition = "2021"
@@ -47,4 +47,5 @@ sha2 = "0.10"
 macos-accessibility-client = "0.0.1"
 objc2 = "0.6"
 objc2-foundation = "0.3"
+objc2-app-kit = { version = "0.3", features = ["NSWindow", "NSResponder", "NSGraphics"] }
 block2 = "0.6"
