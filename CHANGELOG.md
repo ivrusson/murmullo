@@ -14,6 +14,8 @@ Murmullo is still **beta**. Versions stay on the `0.x` line until the product is
 - **Dark mode is readable.** Secondary text, cards, chips, buttons and the Home banner used colours
   made for the light theme, so in dark mode some text almost disappeared and the prompt pills were
   white on white. They now follow the theme.
+- **History rows are no longer cut off.** With enough dictations the rows squeezed to fit the list
+  and clipped their text; they keep their height and the list scrolls.
 - **Murmullo follows the macOS appearance by default.** A new install starts on System instead of
   Light. If you already picked Light or Dark in Settings, that choice stays.
 

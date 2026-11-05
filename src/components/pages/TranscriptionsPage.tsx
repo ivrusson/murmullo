@@ -183,6 +183,8 @@ const styles = stylex.create({
     width: '100%',
     minWidth: 0,
     overflow: 'hidden',
+    // The list scrolls; without this the rows shrink and clip their text.
+    flexShrink: 0,
     textAlign: 'left',
     cursor: 'pointer',
     paddingBlock: {
