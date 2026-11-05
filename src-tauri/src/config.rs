@@ -161,7 +161,7 @@ impl Default for UiConfig {
 }
 
 fn default_theme() -> String {
-    "light".to_string()
+    "system".to_string()
 }
 fn default_ui_lang() -> String {
     "es".to_string()

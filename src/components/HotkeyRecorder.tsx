@@ -31,7 +31,7 @@ const styles = stylex.create({
     paddingBlock: 14,
     paddingInline: 16,
     borderRadius: 20,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: color.card,
     borderColor: color.line,
     borderStyle: 'solid',
     borderWidth: 1,
@@ -45,7 +45,7 @@ const styles = stylex.create({
   },
   hint: {
     margin: 0,
-    color: '#5A5551',
+    color: color.inkSoft,
     fontFamily: font.sans,
     fontSize: 12,
     lineHeight: '16px',
@@ -80,8 +80,8 @@ const styles = stylex.create({
     },
   },
   idle: {
-    backgroundColor: 'rgba(28, 26, 25, 0.05)',
-    borderColor: 'rgba(28, 26, 25, 0.06)',
+    backgroundColor: color.wash,
+    borderColor: color.washLine,
     color: color.ink,
   },
   listening: {

@@ -29,7 +29,7 @@ const styles = stylex.create({
     transitionDuration: motion.fast,
     backgroundColor: {
       default: color.surface,
-      ':hover': '#FFFFFF',
+      ':hover': color.card,
     },
     transform: {
       default: 'none',

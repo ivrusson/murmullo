@@ -28,6 +28,23 @@ export const color = stylex.defineVars({
   blush: 'var(--color-blush)',
   sage: 'var(--color-sage)',
   navActive: 'var(--color-nav-active)',
+  inkSoft: 'var(--color-ink-soft)',
+  card: 'var(--color-card)',
+  edge: 'var(--color-edge)',
+  wash: 'var(--color-wash)',
+  washStrong: 'var(--color-wash-strong)',
+  washLine: 'var(--color-wash-line)',
+  solid: 'var(--color-solid)',
+  solidHover: 'var(--color-solid-hover)',
+  solidInk: 'var(--color-solid-ink)',
+  toneIrisBg: 'var(--color-tone-iris-bg)',
+  toneIrisInk: 'var(--color-tone-iris-ink)',
+  toneSageBg: 'var(--color-tone-sage-bg)',
+  toneSageInk: 'var(--color-tone-sage-ink)',
+  toneBlushBg: 'var(--color-tone-blush-bg)',
+  toneBlushInk: 'var(--color-tone-blush-ink)',
+  toneAmberBg: 'var(--color-tone-amber-bg)',
+  toneAmberInk: 'var(--color-tone-amber-ink)',
 });
 
 export const space = stylex.defineVars({

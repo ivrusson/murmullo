@@ -25,6 +25,30 @@
     --color-copper-ink: #faf8f5;
     --color-live: var(--color-sage);
     --color-live-ink: #faf8f5;
+    /* Solid fills and soft text that used to be hard-coded in components */
+    --color-ink-soft: #5a5551;
+    --color-card: #ffffff;
+    --color-edge: rgba(255, 255, 255, 0.7);
+    --color-wash: rgba(28, 26, 25, 0.05);
+    --color-wash-strong: rgba(28, 26, 25, 0.08);
+    --color-wash-line: rgba(28, 26, 25, 0.06);
+    --color-solid: #1c1a19;
+    --color-solid-hover: #2a2726;
+    --color-solid-ink: #faf8f5;
+    --color-tone-iris-bg: #f4f0f9;
+    --color-tone-iris-ink: #6e5696;
+    --color-tone-sage-bg: #edf4ee;
+    --color-tone-sage-ink: #47784e;
+    --color-tone-blush-bg: #fdf0f0;
+    --color-tone-blush-ink: #a44c47;
+    --color-tone-amber-bg: #f4e9c8;
+    --color-tone-amber-ink: #8a6a1e;
+    --hero-scrim: linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--color-bg) 70%, transparent) 0%,
+      color-mix(in srgb, var(--color-bg) 22%, transparent) 40%,
+      transparent 62%
+    );
 
     --background: var(--color-bg);
     --foreground: var(--color-ink);
@@ -127,6 +151,29 @@
     --color-copper-ink: #f3f0e9;
     --color-live: var(--color-sage);
     --color-live-ink: #121018;
+    --color-ink-soft: #c4bfcc;
+    --color-card: #2a2633;
+    --color-edge: rgba(243, 240, 233, 0.08);
+    --color-wash: rgba(243, 240, 233, 0.06);
+    --color-wash-strong: rgba(243, 240, 233, 0.1);
+    --color-wash-line: rgba(243, 240, 233, 0.08);
+    --color-solid: #f3f0e9;
+    --color-solid-hover: #ffffff;
+    --color-solid-ink: #16141c;
+    --color-tone-iris-bg: rgba(155, 145, 224, 0.18);
+    --color-tone-iris-ink: #cbc4f4;
+    --color-tone-sage-bg: rgba(134, 176, 140, 0.18);
+    --color-tone-sage-ink: #addbb3;
+    --color-tone-blush-bg: rgba(232, 147, 142, 0.18);
+    --color-tone-blush-ink: #f3b5b0;
+    --color-tone-amber-bg: rgba(214, 175, 90, 0.18);
+    --color-tone-amber-ink: #e8cb85;
+    --hero-scrim: linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--color-bg) 92%, transparent) 0%,
+      color-mix(in srgb, var(--color-bg) 70%, transparent) 45%,
+      transparent 75%
+    );
 
     --shadow-card:
       0 4px 20px -2px rgba(0, 0, 0, 0.28), 0 1px 3px 0 rgba(0, 0, 0, 0.18);

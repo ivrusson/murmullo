@@ -32,7 +32,7 @@ const styles = stylex.create({
     borderRadius: radius.lg,
     backgroundColor: {
       default: 'transparent',
-      ':hover': '#ffffff',
+      ':hover': color.card,
     },
     color: 'inherit',
     boxShadow: {
@@ -63,7 +63,7 @@ const styles = stylex.create({
     },
   },
   selected: {
-    backgroundColor: '#ffffff',
+    backgroundColor: color.card,
     boxShadow: shadow.card,
   },
   avatar: {
@@ -106,7 +106,7 @@ const styles = stylex.create({
   },
   preview: {
     margin: 0,
-    color: '#5A5551',
+    color: color.inkSoft,
     fontFamily: font.sans,
     fontSize: 12,
     lineHeight: '16px',

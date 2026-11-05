@@ -63,11 +63,11 @@ const styles = stylex.create({
   },
   primary: {
     backgroundColor: {
-      default: '#1C1A19',
-      ':hover': '#2A2726',
+      default: color.solid,
+      ':hover': color.solidHover,
     },
-    borderColor: '#1C1A19',
-    color: '#FAF8F5',
+    borderColor: color.solid,
+    color: color.solidInk,
     transform: {
       default: 'none',
       ':hover': 'scale(1.02)',
@@ -80,16 +80,16 @@ const styles = stylex.create({
   },
   quiet: {
     backgroundColor: {
-      default: 'rgba(28, 26, 25, 0.05)',
-      ':hover': 'rgba(28, 26, 25, 0.08)',
+      default: color.wash,
+      ':hover': color.washStrong,
     },
-    borderColor: 'rgba(28, 26, 25, 0.06)',
+    borderColor: color.washLine,
     color: color.ink,
   },
   ghost: {
     backgroundColor: {
       default: 'transparent',
-      ':hover': 'rgba(28, 26, 25, 0.05)',
+      ':hover': color.wash,
     },
     borderColor: 'transparent',
     borderWidth: 0,
@@ -103,7 +103,7 @@ const styles = stylex.create({
   live: {
     backgroundColor: color.sage,
     borderColor: color.sage,
-    color: '#FAF8F5',
+    color: color.liveInk,
   },
   danger: {
     backgroundColor: {

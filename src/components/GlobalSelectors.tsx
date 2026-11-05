@@ -42,7 +42,7 @@ const styles = stylex.create({
     borderRadius: radius.pill,
     backgroundColor: {
       default: 'transparent',
-      ':hover': 'rgba(28, 26, 25, 0.05)',
+      ':hover': color.wash,
     },
     color: color.muted,
     cursor: 'pointer',
@@ -58,12 +58,12 @@ const styles = stylex.create({
     width: 'fit-content',
   },
   ready: {
-    backgroundColor: '#EDF4EE',
-    color: '#47784E',
+    backgroundColor: color.toneSageBg,
+    color: color.toneSageInk,
   },
   wait: {
-    backgroundColor: '#F4F0F9',
-    color: '#6E5696',
+    backgroundColor: color.toneIrisBg,
+    color: color.toneIrisInk,
   },
 });
 

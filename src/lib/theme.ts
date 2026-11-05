@@ -14,5 +14,5 @@ export function normalizeTheme(
   if (value === 'light' || value === 'dark' || value === 'system') {
     return value;
   }
-  return 'light';
+  return 'system';
 }

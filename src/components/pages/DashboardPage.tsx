@@ -43,7 +43,7 @@ const styles = stylex.create({
     paddingBlock: 16,
     paddingInline: 24,
     borderRadius: radius.xl,
-    borderColor: 'rgba(255, 255, 255, 0.7)',
+    borderColor: color.edge,
     borderStyle: 'solid',
     borderWidth: 1,
     boxShadow: shadow.card,
@@ -113,8 +113,7 @@ const styles = stylex.create({
       '@media (max-width: 860px)': 'none',
     },
     pointerEvents: 'none',
-    backgroundImage:
-      'linear-gradient(90deg, color-mix(in srgb, var(--color-bg) 70%, transparent) 0%, color-mix(in srgb, var(--color-bg) 22%, transparent) 40%, transparent 62%)',
+    backgroundImage: 'var(--hero-scrim)',
   },
   content: {
     display: 'flex',
@@ -138,7 +137,7 @@ const styles = stylex.create({
     paddingLeft: 24,
     borderRadius: 24,
     backgroundColor: color.surface,
-    borderColor: 'rgba(255, 255, 255, 0.7)',
+    borderColor: color.edge,
     borderStyle: 'solid',
     borderWidth: 1,
     boxShadow: shadow.card,

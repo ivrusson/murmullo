@@ -36,7 +36,7 @@ const styles = stylex.create({
     marginTop: space.sm,
     marginBottom: 0,
     maxWidth: '38rem',
-    color: '#5A5551',
+    color: color.inkSoft,
     fontFamily: font.sans,
     fontSize: 14,
     lineHeight: '22px',
