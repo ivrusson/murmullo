@@ -364,6 +364,9 @@ export const FloatingBar: React.FC = () => {
   if (panelKind) lastPanelRef.current = panelKind;
   const panelRef = useRef(panelKind);
   panelRef.current = panelKind;
+  const hasNotice = notice !== null;
+  const noticeRef = useRef(hasNotice);
+  noticeRef.current = hasNotice;
 
   const publishGeometry = useCallback((geo: OverlayGeometry) => {
     geometryRef.current = geo;
@@ -380,7 +383,11 @@ export const FloatingBar: React.FC = () => {
   const syncOverlayFrame = useCallback(async () => {
     const gen = ++applyGenRef.current;
     window.clearTimeout(shrinkTimerRef.current);
-    const target = overlayWindowSize(modeRef.current, panelRef.current);
+    const target = overlayWindowSize(
+      modeRef.current,
+      panelRef.current,
+      noticeRef.current
+    );
     const current = geometryRef.current;
     const grows =
       !current ||
@@ -883,7 +890,7 @@ export const FloatingBar: React.FC = () => {
   // is in flight by the time the new content is visible.
   useLayoutEffect(() => {
     void syncOverlayFrame();
-  }, [mode, panelKind, syncOverlayFrame]);
+  }, [mode, panelKind, hasNotice, syncOverlayFrame]);
 
   useEffect(() => {
     const endPointer = () => {
@@ -1066,8 +1073,8 @@ export const FloatingBar: React.FC = () => {
   const panelOpen =
     panelKind !== null &&
     (!isTauriRuntime() ||
-      sizeFits(appliedSize, overlayWindowSize(mode, panelKind)));
-  const stage = stageSizeForMode(mode);
+      sizeFits(appliedSize, overlayWindowSize(mode, panelKind, hasNotice)));
+  const stage = stageSizeForMode(mode, hasNotice);
 
   return (
     <div

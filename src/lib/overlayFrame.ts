@@ -43,8 +43,12 @@ export const HUD_PANEL_NOMINAL: Record<
 export type HudSize = { width: number; height: number };
 export type HudPoint = { x: number; y: number };
 
-export function stageSizeForMode(mode: string): HudSize {
+export function stageSizeForMode(mode: string, toast = false): HudSize {
   const mascot = HUD_MASCOT_DISPLAY;
+  if (mode === 'rest' && toast) {
+    // A notice can outlive the hover; keep its headroom so it is not clipped.
+    return { width: mascot + 28, height: mascot + HUD_STAGE_HEAD * 2 };
+  }
   if (mode === 'rest') {
     return { width: mascot + 28, height: mascot + 28 };
   }
@@ -57,9 +61,10 @@ export function stageSizeForMode(mode: string): HudSize {
 /** Symmetric window box for a mode and optional panel. */
 export function overlayWindowSize(
   mode: string,
-  panel: HudPanelKind | null
+  panel: HudPanelKind | null,
+  toast = false
 ): HudSize {
-  const stage = stageSizeForMode(mode);
+  const stage = stageSizeForMode(mode, toast);
   let width = stage.width + HUD_SHADOW_PAD_X;
   let height = stage.height + HUD_SHADOW_PAD_Y;
   if (panel) {

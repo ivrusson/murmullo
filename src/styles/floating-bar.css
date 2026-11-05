@@ -21,6 +21,8 @@
   --hud-glow-listen: rgba(122, 162, 192, 0.65);
   --hud-mascot: 96px;
   --hud-orbital: 36px;
+  /* Center-to-orbital distance: the body is narrower than the mascot box. */
+  --hud-orbit-gap: calc(var(--hud-mascot) / 2 - 14px);
   --hud-ease: cubic-bezier(0.22, 1, 0.36, 1);
   --hud-ease-out: cubic-bezier(0.4, 0, 1, 1);
   --hud-duration: 180ms;
@@ -239,14 +241,14 @@ body {
 }
 
 .hud-orbitals-side.is-left {
-  --hud-orbit-from: calc(var(--hud-mascot) / 2 + 10px);
-  right: calc(var(--hud-mascot) / 2 + 10px);
+  --hud-orbit-from: var(--hud-orbit-gap);
+  right: var(--hud-orbit-gap);
   align-items: flex-end;
 }
 
 .hud-orbitals-side.is-right {
-  --hud-orbit-from: calc(-1 * (var(--hud-mascot) / 2 + 10px));
-  left: calc(var(--hud-mascot) / 2 + 10px);
+  --hud-orbit-from: calc(-1 * var(--hud-orbit-gap));
+  left: var(--hud-orbit-gap);
   align-items: flex-start;
 }
 
