@@ -5,6 +5,7 @@ import {
   useRef,
   useState,
   type MouseEventHandler,
+  type ReactNode,
 } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
@@ -12,69 +13,45 @@ import { currentMonitor, getCurrentWindow } from '@tauri-apps/api/window';
 import { useOverlayClickThrough } from '@/hooks/useOverlayClickThrough';
 import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion';
 import { hotkeyParts } from '@/lib/hotkey';
+import type { OverlayWorkArea } from '@/lib/overlayPlacement';
 import {
-  clampToWorkArea,
-  decideOverlayPlacement,
-  type OverlayPlacement,
-} from '@/lib/overlayPlacement';
+  mascotPointForAnchor,
+  normalizeOverlayAnchor,
+  type OverlayAnchor,
+} from '@/lib/overlayAnchor';
 import {
-  OVERLAY_STYLE_CHANNEL,
-  OVERLAY_STYLE_STORAGE_KEY,
-  normalizeOverlayStyle,
-  readStoredOverlayStyle,
-  storeOverlayStyle,
-  type OverlayStyle,
-} from '@/lib/overlayStyle';
+  mascotFromWindow,
+  overlayWindowSize,
+  stageSizeForMode,
+  windowOriginForMascot,
+  type HudPanelKind,
+  type HudPoint,
+  type HudSize,
+} from '@/lib/overlayFrame';
 import { insertionService, overlayService } from '@/services/tauri';
 import { TranscriptionService } from '@/services/transcriptionService';
 import type { AppConfig, OverlayLayout } from '@/types';
 import type { MurmulloSceneMode } from '@/mascot/MurmulloView';
 import {
-  ActionsContent,
-  CancelledContent,
-  CardActionsContent,
-  CardCancelledContent,
-  CardDoneContent,
-  CardErrorContent,
-  CardListeningContent,
-  CardProcessingContent,
-  CardControlsContent,
-  CardHistoryContent,
-  CardMenuContent,
-  CardReadyContent,
-  CardTranscribedContent,
-  CompactContent,
-  DoneContent,
-  ErrorContent,
+  CancelledPanel,
+  ErrorPanel,
   HudLayer,
   HudMascot,
   HudModal,
+  HudPanel,
   HudQuickMenu,
   HudStage,
   HudToast,
-  HUD_MASCOT_RENDER_SIZE,
-  ListeningContent,
-  ProcessingContent,
-  ReadyContent,
-  TranscribedContent,
-  type HudHistoryItem,
+  ListeningOrbitals,
+  ProcessingToast,
+  ReadyOrbitals,
+  ResultPanel,
   type HudMode,
   type HudModalKind,
   type HudNoticeKind,
   type HudTranscription,
-  type MascotPlacement,
+  type OrbitalActionId,
 } from './FloatingBarStates';
-import { improveDictation } from '@/correction/improve';
-import {
-  rewriteWithConfiguredLlm,
-  summarizePrompt,
-  translatePrompt,
-} from '@/lib/localLlm';
-import {
-  queuePendingDictationContext,
-  type MurmulloContextLabel,
-} from '@/lib/pendingDictationContext';
-import { formatRelativeTime } from '@/lib/formatRelativeTime';
 import {
   mapBackendError,
   parseCodedError,
@@ -102,15 +79,11 @@ function storedAutoInsert(): boolean | null {
     return null;
   }
 }
+
 const RESULT_MODES: ReadonlySet<HudMode> = new Set([
   'done',
   'transcribed',
   'actions',
-]);
-const PANEL_MODES: ReadonlySet<HudMode> = new Set([
-  'menu',
-  'history',
-  'controls',
 ]);
 const STICKY_IDLE_MODES: ReadonlySet<HudMode> = new Set([
   'transcribed',
@@ -118,84 +91,13 @@ const STICKY_IDLE_MODES: ReadonlySet<HudMode> = new Set([
   'done',
   'cancelled',
   'error',
-  'menu',
-  'history',
-  'controls',
 ]);
 const HUD_LEAVE_MS = 200;
-const HUD_TOAST_EXTRA = 40;
-const HUD_MENU_EXTRA = 180;
-const HUD_MODAL_EXTRA = 220;
-/** Room for soft shadows without a huge invisible click shield around the HUD. */
-const HUD_SHADOW_PAD_X = 40;
-const HUD_SHADOW_PAD_Y = 48;
-
-const HUD_MODE_SIZE: Record<HudMode, { width: number; height: number }> = {
-  rest: { width: HUD_MASCOT_RENDER_SIZE, height: HUD_MASCOT_RENDER_SIZE },
-  ready: { width: 300, height: 64 },
-  listening: { width: 340, height: 64 },
-  processing: { width: 240, height: 64 },
-  done: { width: 168, height: 64 },
-  transcribed: { width: 508, height: 64 },
-  actions: { width: 508, height: 64 },
-  compact: { width: 220, height: 52 },
-  cancelled: { width: 300, height: 64 },
-  error: { width: 360, height: 64 },
-  menu: { width: 280, height: 64 },
-  history: { width: 280, height: 64 },
-  controls: { width: 280, height: 64 },
-};
-
-const ISLAND_MODE_SIZE: Record<HudMode, { width: number; height: number }> = {
-  rest: { width: 56, height: 56 },
-  ready: { width: 292, height: 56 },
-  listening: { width: 252, height: 56 },
-  processing: { width: 208, height: 56 },
-  done: { width: 148, height: 56 },
-  transcribed: { width: 420, height: 56 },
-  actions: { width: 460, height: 56 },
-  compact: { width: 220, height: 52 },
-  cancelled: { width: 268, height: 56 },
-  error: { width: 332, height: 56 },
-  menu: { width: 280, height: 56 },
-  history: { width: 280, height: 56 },
-  controls: { width: 280, height: 56 },
-};
-
-const CARD_MODE_SIZE: Record<HudMode, { width: number; height: number }> = {
-  rest: { width: 280, height: 236 },
-  ready: { width: 280, height: 236 },
-  listening: { width: 280, height: 248 },
-  processing: { width: 280, height: 292 },
-  done: { width: 280, height: 132 },
-  transcribed: { width: 280, height: 332 },
-  actions: { width: 280, height: 280 },
-  compact: { width: 220, height: 52 },
-  cancelled: { width: 280, height: 176 },
-  error: { width: 280, height: 196 },
-  menu: { width: 280, height: 336 },
-  history: { width: 280, height: 280 },
-  controls: { width: 280, height: 268 },
-};
-
-const CARD_PERCH = 72;
-
-function contentSize(
-  style: OverlayStyle,
-  mode: HudMode
-): { width: number; height: number } {
-  if (style === 'island') return ISLAND_MODE_SIZE[mode];
-  if (style === 'card') return CARD_MODE_SIZE[mode];
-  return HUD_MODE_SIZE[mode];
-}
-
-function mascotPlacement(style: OverlayStyle, mode: HudMode): MascotPlacement {
-  if (style === 'card') return 'perch';
-  if (style === 'island') return 'inset';
-  return mode === 'rest' ? 'rest' : 'inset';
-}
-
-type OverlayExtras = { toast: boolean; menu: boolean; modal: boolean };
+/**
+ * Window shrinks wait for the leave transitions (orbitals, panel) to finish.
+ * Must cover --hud-duration plus the orbital stagger.
+ */
+const HUD_SHRINK_DELAY_MS = 240;
 
 type OverlayGeometry = {
   x: number;
@@ -208,57 +110,19 @@ type OverlayGeometry = {
   workHeight: number;
 };
 
-const CLOSED_EXTRAS: OverlayExtras = {
-  toast: false,
-  menu: false,
-  modal: false,
-};
-
-function overlayWindowSize(
-  style: OverlayStyle,
-  mode: HudMode,
-  extras: OverlayExtras
-): { width: number; height: number } {
-  const base = contentSize(style, mode);
-  const width = Math.max(base.width, extras.modal ? 360 : 0) + HUD_SHADOW_PAD_X;
-  let height = base.height + HUD_SHADOW_PAD_Y;
-  if (style === 'pill') {
-    height = Math.max(base.height, HUD_MASCOT_RENDER_SIZE) + HUD_SHADOW_PAD_Y;
-  } else if (style === 'card') {
-    height = base.height + CARD_PERCH + HUD_SHADOW_PAD_Y;
-  }
-  if (extras.toast) height += HUD_TOAST_EXTRA;
-  if (extras.menu) height += HUD_MENU_EXTRA;
-  if (extras.modal) height += HUD_MODAL_EXTRA;
-  return { width, height };
-}
-
-function languageLabelFor(language?: string): string {
-  const value = language?.trim().toLowerCase() ?? '';
-  if (!value || value === 'auto') return translate('settings.sttLang.auto');
-  if (value.startsWith('es')) return translate('settings.sttLang.es');
-  if (value.startsWith('en')) return translate('settings.sttLang.en');
-  if (value.startsWith('fr')) return translate('settings.sttLang.fr');
-  if (value.startsWith('pt')) return translate('settings.sttLang.pt');
-  if (value.startsWith('de')) return translate('settings.sttLang.de');
-  if (value.startsWith('it')) return translate('settings.sttLang.it');
-  return language?.trim() || translate('settings.sttLang.auto');
-}
-
-function friendlyModelLabel(model?: string): string {
-  const value = model?.trim() ?? '';
-  if (!value) return translate('settings.balanced');
-  const last = value.split(/[\\/]/).pop() ?? value;
-  return (
-    last.replace(/\.(gguf|bin|onnx)$/i, '') || translate('settings.balanced')
-  );
+function workAreaOf(geo: OverlayGeometry): OverlayWorkArea {
+  return {
+    x: geo.workX,
+    y: geo.workY,
+    width: geo.workWidth,
+    height: geo.workHeight,
+  };
 }
 
 function sceneModeForHud(mode: HudMode): MurmulloSceneMode {
   if (mode === 'error') return 'error';
   switch (mode) {
     case 'listening':
-    case 'compact':
       return 'recording';
     case 'processing':
       return 'processing';
@@ -266,10 +130,6 @@ function sceneModeForHud(mode: HudMode): MurmulloSceneMode {
     case 'transcribed':
     case 'actions':
       return 'complete';
-    case 'menu':
-    case 'history':
-    case 'controls':
-      return 'idle';
     default:
       return 'idle';
   }
@@ -311,16 +171,6 @@ function isTauriRuntime(): boolean {
     }
   ).__TAURI_INTERNALS__;
   return typeof internals?.invoke === 'function';
-}
-
-function overlayExtrasHeight(
-  style: OverlayStyle,
-  mode: HudMode,
-  extras: OverlayExtras
-): number {
-  const full = overlayWindowSize(style, mode, extras);
-  const base = overlayWindowSize(style, mode, CLOSED_EXTRAS);
-  return Math.max(0, full.height - base.height);
 }
 
 function readBrowserOverlayGeometry(): OverlayGeometry {
@@ -371,28 +221,6 @@ async function readOverlayGeometry(): Promise<OverlayGeometry> {
   return readBrowserOverlayGeometry();
 }
 
-function placementForGeometry(
-  style: OverlayStyle,
-  mode: HudMode,
-  extras: OverlayExtras,
-  geometry: OverlayGeometry,
-  shift: number
-): OverlayPlacement {
-  const extrasHeight = overlayExtrasHeight(style, mode, extras);
-  if (extrasHeight <= 0) return 'below';
-  const base = overlayWindowSize(style, mode, CLOSED_EXTRAS);
-  const hudHeight = isTauriRuntime()
-    ? base.height
-    : Math.max(base.height, geometry.height);
-  return decideOverlayPlacement({
-    hudY: geometry.y + shift,
-    hudHeight,
-    extrasHeight,
-    workTop: geometry.workY,
-    workHeight: geometry.workHeight,
-  });
-}
-
 function overlayError(error: unknown, fallbackKey: AppMessageKey): string {
   const raw =
     error instanceof Error
@@ -425,104 +253,60 @@ function needsOpenApp(message: string): boolean {
   );
 }
 
-async function persistOverlayPosition(shift: number): Promise<void> {
-  try {
-    const win = currentOverlayWindow();
-    if (!win) return;
-    const physical = await win.outerPosition();
-    const scale = await win.scaleFactor();
-    const factor = scale > 0 ? scale : 1;
-    const x = physical.x / factor;
-    const y = physical.y / factor + shift;
-    await overlayService.savePosition(x, y);
-  } catch (error) {
-    console.error('[murmullo:overlay] save position failed', error);
-  }
+function sizeFits(outer: HudSize | null, inner: HudSize): boolean {
+  if (!outer) return false;
+  return outer.width + 0.5 >= inner.width && outer.height + 0.5 >= inner.height;
 }
 
+/**
+ * Move/resize the native window so it stays symmetric around the mascot.
+ * Returns the geometry the window now has.
+ */
 async function applyOverlayFrame(
-  style: OverlayStyle,
-  mode: HudMode,
-  extras: OverlayExtras,
-  shiftRef: { current: number },
-  geometryRef: { current: OverlayGeometry | null }
-): Promise<OverlayPlacement> {
-  const extrasHeight = overlayExtrasHeight(style, mode, extras);
-  const fullSize = overlayWindowSize(style, mode, extras);
+  target: HudSize,
+  mascotRef: { current: HudPoint | null }
+): Promise<OverlayGeometry> {
   const geo = await readOverlayGeometry();
-  const anchorX = geo.x;
-  const anchorY = geo.y + shiftRef.current;
-  const placement = placementForGeometry(
-    style,
-    mode,
-    extras,
-    geo,
-    shiftRef.current
-  );
+  if (!mascotRef.current) {
+    const derived = mascotFromWindow(
+      { x: geo.x, y: geo.y },
+      { width: geo.width, height: geo.height }
+    );
+    mascotRef.current = { x: Math.round(derived.x), y: Math.round(derived.y) };
+  }
+  const origin = windowOriginForMascot(mascotRef.current, target);
 
   if (!isTauriRuntime()) {
-    shiftRef.current = 0;
-    geometryRef.current = geo;
-    return placement;
+    return geo;
   }
-
-  const unclampedY =
-    placement === 'above' && extrasHeight > 0
-      ? anchorY - extrasHeight
-      : anchorY;
-  const clamped = clampToWorkArea(
-    anchorX,
-    unclampedY,
-    fullSize.width,
-    fullSize.height,
-    {
-      x: geo.workX,
-      y: geo.workY,
-      width: geo.workWidth,
-      height: geo.workHeight,
-    }
-  );
-  const appliedShift =
-    placement === 'above' && extrasHeight > 0 ? anchorY - clamped.y : 0;
 
   const sameSize =
-    Math.abs(geo.width - fullSize.width) < 1 &&
-    Math.abs(geo.height - fullSize.height) < 1;
+    Math.abs(geo.width - target.width) < 1 &&
+    Math.abs(geo.height - target.height) < 1;
   const samePos =
-    Math.abs(geo.x - clamped.x) < 1 && Math.abs(geo.y - clamped.y) < 1;
+    Math.abs(geo.x - origin.x) < 1 && Math.abs(geo.y - origin.y) < 1;
   if (!sameSize || !samePos) {
-    try {
-      await overlayService.resize(
-        fullSize.width,
-        fullSize.height,
-        clamped.x,
-        clamped.y
-      );
-    } catch (error) {
-      console.error('[murmullo:overlay] resize failed', error);
-      return placement;
-    }
+    await overlayService.resize(
+      target.width,
+      target.height,
+      origin.x,
+      origin.y
+    );
   }
-
-  shiftRef.current = appliedShift;
-  geometryRef.current = {
+  return {
     ...geo,
-    x: clamped.x,
-    y: clamped.y,
-    width: fullSize.width,
-    height: fullSize.height,
+    x: origin.x,
+    y: origin.y,
+    width: target.width,
+    height: target.height,
   };
-  return placement;
 }
 
 export const FloatingBar: React.FC = () => {
   const t = useT();
   const reducedMotion = usePrefersReducedMotion();
   const [mode, setMode] = useState<HudMode>('rest');
-  const [overlayStyle, setOverlayStyle] = useState<OverlayStyle>(
-    readStoredOverlayStyle
-  );
-  const [compactPref, setCompactPref] = useState(false);
+  const [anchor, setAnchor] = useState<OverlayAnchor>('bottom');
   const [audioLevel, setAudioLevel] = useState(0);
   const [transcription, setTranscription] = useState<HudTranscription | null>(
     null
@@ -537,77 +321,126 @@ export const FloatingBar: React.FC = () => {
   const [draft, setDraft] = useState('');
   const [processingMessage, setProcessingMessage] =
     useState('status.processing');
-  const [pttParts, setPttParts] = useState<string[]>(['Cmd', 'Opt', 'T']);
-  const [placement, setPlacement] = useState<OverlayPlacement>('above');
-  const [historyItems, setHistoryItems] = useState<HudHistoryItem[]>([]);
-  const [historyQuery, setHistoryQuery] = useState('');
   const [autoInsert, setAutoInsert] = useState(
     () => storedAutoInsert() ?? true
   );
-  const [sttLanguage, setSttLanguage] = useState('');
-  const [modelId, setModelId] = useState('');
   const [errorOpenApp, setErrorOpenApp] = useState(false);
+  /** Window box the native window currently has (after our last apply). */
+  const [appliedSize, setAppliedSize] = useState<HudSize | null>(null);
+  const [work, setWork] = useState<OverlayWorkArea | null>(null);
+  const [mascotPoint, setMascotPoint] = useState<HudPoint | null>(null);
 
   const modeRef = useRef(mode);
-  const overlayStyleRef = useRef(overlayStyle);
-  const compactPrefRef = useRef(compactPref);
   const draggingRef = useRef(false);
   const expectingCancelRef = useRef(false);
   const localBusyRef = useRef(false);
   const menuOpenRef = useRef(menuOpen);
   const modalRef = useRef(modal);
-  const noticeRef = useRef(notice);
   const hoverRef = useRef(false);
   const pointerDownRef = useRef(false);
   const leaveTimerRef = useRef(0);
-  const shiftRef = useRef(0);
+  const shrinkTimerRef = useRef(0);
   const geometryRef = useRef<OverlayGeometry | null>(null);
+  const mascotRef = useRef<HudPoint | null>(null);
   const applyingRef = useRef(false);
   const applyGenRef = useRef(0);
   const autoInsertRef = useRef(autoInsert);
+  const lastPanelRef = useRef<HudPanelKind>('result');
   modeRef.current = mode;
   autoInsertRef.current = autoInsert;
-  overlayStyleRef.current = overlayStyle;
-  compactPrefRef.current = compactPref;
   menuOpenRef.current = menuOpen;
   modalRef.current = modal;
-  noticeRef.current = notice;
 
-  const extras: OverlayExtras = {
-    toast: notice !== null,
-    menu: menuOpen,
-    modal: modal !== null,
-  };
+  const panelKind: HudPanelKind | null =
+    modal === 'edit'
+      ? 'edit'
+      : menuOpen
+        ? 'menu'
+        : mode === 'transcribed' || mode === 'actions'
+          ? 'result'
+          : mode === 'cancelled' || mode === 'error'
+            ? 'notice'
+            : null;
+  if (panelKind) lastPanelRef.current = panelKind;
+  const panelRef = useRef(panelKind);
+  panelRef.current = panelKind;
 
-  const currentExtras = useCallback(
-    (): OverlayExtras => ({
-      toast: noticeRef.current !== null,
-      menu: menuOpenRef.current,
-      modal: modalRef.current !== null,
-    }),
-    []
-  );
+  const publishGeometry = useCallback((geo: OverlayGeometry) => {
+    geometryRef.current = geo;
+    setWork(workAreaOf(geo));
+    setAppliedSize({ width: geo.width, height: geo.height });
+    if (mascotRef.current) setMascotPoint(mascotRef.current);
+  }, []);
 
+  /**
+   * Bring the window to the box the current mode/panel needs.
+   * Growth is immediate; shrinking waits for leave transitions so nothing is
+   * clipped mid-animation.
+   */
   const syncOverlayFrame = useCallback(async () => {
     const gen = ++applyGenRef.current;
+    window.clearTimeout(shrinkTimerRef.current);
+    const target = overlayWindowSize(modeRef.current, panelRef.current);
+    const current = geometryRef.current;
+    const grows =
+      !current ||
+      target.width > current.width + 0.5 ||
+      target.height > current.height + 0.5;
+    const shrinks =
+      !grows &&
+      current !== null &&
+      (target.width < current.width - 0.5 ||
+        target.height < current.height - 0.5);
+
+    if (shrinks && !reducedMotion) {
+      await new Promise<void>(resolve => {
+        shrinkTimerRef.current = window.setTimeout(
+          resolve,
+          HUD_SHRINK_DELAY_MS
+        );
+      });
+      if (gen !== applyGenRef.current) return;
+    }
+
     applyingRef.current = true;
     try {
-      const next = await applyOverlayFrame(
-        overlayStyleRef.current,
-        modeRef.current,
-        currentExtras(),
-        shiftRef,
-        geometryRef
-      );
+      const geo = await applyOverlayFrame(target, mascotRef);
       if (gen !== applyGenRef.current) return;
-      setPlacement(next);
+      publishGeometry(geo);
+    } catch (error) {
+      console.error('[murmullo:overlay] frame failed', error);
     } finally {
       if (gen === applyGenRef.current) applyingRef.current = false;
     }
-  }, [currentExtras]);
+  }, [publishGeometry, reducedMotion]);
 
-  const saveOverlayPosition = useCallback(() => {
-    void persistOverlayPosition(shiftRef.current);
+  /** After a drag: the window is symmetric, so its center is the mascot. */
+  const saveOverlayPosition = useCallback(async () => {
+    try {
+      const geo = await readOverlayGeometry();
+      const derived = mascotFromWindow(
+        { x: geo.x, y: geo.y },
+        { width: geo.width, height: geo.height }
+      );
+      const next = { x: Math.round(derived.x), y: Math.round(derived.y) };
+      const prev = mascotRef.current;
+      geometryRef.current = geo;
+      setWork(workAreaOf(geo));
+      if (
+        prev &&
+        Math.abs(prev.x - next.x) < 1 &&
+        Math.abs(prev.y - next.y) < 1
+      ) {
+        return;
+      }
+      mascotRef.current = next;
+      setMascotPoint(next);
+      if (!isTauriRuntime()) return;
+      await overlayService.savePosition(next.x, next.y);
+      setAnchor('custom');
+    } catch (error) {
+      console.error('[murmullo:overlay] save position failed', error);
+    }
   }, []);
 
   const closeOverlays = useCallback(() => {
@@ -624,26 +457,8 @@ export const FloatingBar: React.FC = () => {
     setNotice(null);
     setErrorMessage('');
     setDraft('');
-    setHistoryQuery('');
     closeOverlays();
   }, [closeOverlays]);
-
-  const persistAutoInsert = useCallback((next: boolean) => {
-    setAutoInsert(next);
-    try {
-      window.localStorage.setItem(AUTO_INSERT_KEY, next ? '1' : '0');
-    } catch {
-      // overlay webview without storage
-    }
-    if (isTauriRuntime()) {
-      void insertionService.setAutoInsert(next).catch(error => {
-        console.error(
-          '[murmullo:overlay] auto-insert preference failed',
-          error
-        );
-      });
-    }
-  }, []);
 
   const showPlainError = useCallback((message: string, openApp = false) => {
     window.clearTimeout(leaveTimerRef.current);
@@ -689,8 +504,7 @@ export const FloatingBar: React.FC = () => {
   }, []);
 
   const cancelRecording = useCallback(() => {
-    const current = modeRef.current;
-    if (current === 'listening' || current === 'compact') {
+    if (modeRef.current === 'listening') {
       expectingCancelRef.current = true;
     }
     void invoke('overlay_cancel_dictation').catch(error => {
@@ -724,98 +538,6 @@ export const FloatingBar: React.FC = () => {
     if (text) void navigator.clipboard.writeText(text);
     returnToIdle();
   }, [returnToIdle, transcription]);
-
-  const startWithContext = useCallback(
-    (context: MurmulloContextLabel) => {
-      queuePendingDictationContext(context);
-      startRecording();
-    },
-    [startRecording]
-  );
-
-  const rewriteCurrent = useCallback(
-    async (prompt: string, busyLabel: string) => {
-      const text = transcription?.text?.trim() ?? '';
-      if (!text) return;
-      closeOverlays();
-      localBusyRef.current = true;
-      setProcessingMessage(busyLabel);
-      setMode('processing');
-      try {
-        const next = await rewriteWithConfiguredLlm(prompt, text);
-        if (next) {
-          setTranscription(current =>
-            current
-              ? { ...current, text: next }
-              : { text: next, duration_ms: 0, model_used: '' }
-          );
-        }
-        setMode('transcribed');
-        setNotice({
-          kind: 'insert',
-          message: next ? t('hud.textUpdated') : t('hud.rewriteFailed'),
-        });
-      } finally {
-        localBusyRef.current = false;
-      }
-    },
-    [closeOverlays, transcription, t]
-  );
-
-  const improveCurrent = useCallback(async () => {
-    const text = transcription?.text?.trim() ?? '';
-    if (!text) return;
-    closeOverlays();
-    localBusyRef.current = true;
-    setProcessingMessage('status.browserCorrecting');
-    setMode('processing');
-    try {
-      const next = await improveDictation(text);
-      if (next) {
-        setTranscription(current =>
-          current
-            ? { ...current, text: next }
-            : { text: next, duration_ms: 0, model_used: '' }
-        );
-      }
-      setMode('transcribed');
-      setNotice({
-        kind: 'insert',
-        message: next ? t('hud.textUpdated') : t('hud.rewriteFailed'),
-      });
-    } finally {
-      localBusyRef.current = false;
-    }
-  }, [closeOverlays, transcription, t]);
-
-  const openHistory = useCallback(() => {
-    closeOverlays();
-    setHistoryQuery('');
-    setMode('history');
-    void TranscriptionService.listTranscriptions()
-      .then(items => {
-        setHistoryItems(
-          items.slice(0, 8).map(item => ({
-            id: item.id,
-            text: item.text,
-            created_at: item.created_at,
-          }))
-        );
-      })
-      .catch(error => {
-        console.error('[murmullo:overlay] history failed', error);
-        showError(error, 'hud.historyFailed');
-      });
-  }, [closeOverlays, showError]);
-
-  const closePanel = useCallback(() => {
-    if (transcription && PANEL_MODES.has(modeRef.current)) {
-      setMode('transcribed');
-      closeOverlays();
-      return;
-    }
-    returnToIdle();
-  }, [closeOverlays, returnToIdle, transcription]);
 
   const showLastMurmur = useCallback(async () => {
     try {
@@ -856,30 +578,44 @@ export const FloatingBar: React.FC = () => {
     });
   }, []);
 
-  const toggleCompactPref = useCallback(() => {
-    const next = !compactPrefRef.current;
-    setCompactPref(next);
-    void overlayService.setCompact(next).catch(error => {
-      console.error('[murmullo:overlay] set compact failed', error);
-    });
-    if (
-      modeRef.current === 'listening' &&
-      next &&
-      overlayStyleRef.current === 'pill'
-    ) {
-      setMode('compact');
-    }
-    if (modeRef.current === 'compact' && !next) setMode('listening');
-    setMenuOpen(false);
-  }, []);
+  /**
+   * Cardinal snap: pick the mascot point for that edge, move the window
+   * around it (same math the window always uses), then persist edge + point.
+   */
+  const snapToAnchor = useCallback(
+    (next: Exclude<OverlayAnchor, 'custom'>) => {
+      setAnchor(next);
+      setMenuOpen(false);
+      void (async () => {
+        try {
+          const geo = geometryRef.current ?? (await readOverlayGeometry());
+          const point = mascotPointForAnchor(next, workAreaOf(geo));
+          mascotRef.current = {
+            x: Math.round(point.x),
+            y: Math.round(point.y),
+          };
+          setMascotPoint(mascotRef.current);
+          await syncOverlayFrame();
+          if (!isTauriRuntime()) return;
+          const layout = await overlayService.setAnchor(
+            next,
+            mascotRef.current.x,
+            mascotRef.current.y
+          );
+          setAnchor(normalizeOverlayAnchor(layout.anchor));
+        } catch (error) {
+          console.error('[murmullo:overlay] set anchor failed', error);
+        }
+      })();
+    },
+    [syncOverlayFrame]
+  );
 
   const beginChromeDrag: MouseEventHandler<HTMLDivElement> = useCallback(
     event => {
       window.clearTimeout(leaveTimerRef.current);
       pointerDownRef.current = true;
       if (event.button !== 0 || isNoDragTarget(event.target)) return;
-      // macOS window dragging needs the current native event to still be the
-      // left mouse-down. Clear selection only after the drag has been requested.
       draggingRef.current = true;
       const win = currentOverlayWindow();
       if (!win) {
@@ -905,7 +641,6 @@ export const FloatingBar: React.FC = () => {
   const enterReady = useCallback(() => {
     hoverRef.current = true;
     window.clearTimeout(leaveTimerRef.current);
-    if (overlayStyleRef.current === 'card') return;
     if (modeRef.current === 'rest') setMode('ready');
   }, []);
 
@@ -919,6 +654,26 @@ export const FloatingBar: React.FC = () => {
     }, HUD_LEAVE_MS);
   }, []);
 
+  const handleOrbital = useCallback(
+    (id: OrbitalActionId) => {
+      switch (id) {
+        case 'dictate':
+          startRecording();
+          break;
+        case 'more':
+          setMenuOpen(true);
+          break;
+        case 'stop':
+          stopRecording();
+          break;
+        case 'cancel':
+          cancelRecording();
+          break;
+      }
+    },
+    [cancelRecording, startRecording, stopRecording]
+  );
+
   useOverlayClickThrough({
     enabled: isTauriRuntime(),
     isDragging: () => draggingRef.current || pointerDownRef.current,
@@ -929,16 +684,7 @@ export const FloatingBar: React.FC = () => {
   });
 
   const applyLayout = useCallback((layout: OverlayLayout) => {
-    const nextStyle = normalizeOverlayStyle(layout.style);
-    setCompactPref(layout.compact);
-    setOverlayStyle(nextStyle);
-    storeOverlayStyle(nextStyle);
-    if (nextStyle !== 'pill' && modeRef.current === 'compact') {
-      setMode('listening');
-    }
-    if (nextStyle === 'card' && modeRef.current === 'ready') {
-      setMode('rest');
-    }
+    setAnchor(normalizeOverlayAnchor(layout.anchor));
   }, []);
 
   useEffect(() => {
@@ -953,7 +699,17 @@ export const FloatingBar: React.FC = () => {
         model_used: 'preview',
       });
       setMode(preview);
+    } else if (
+      preview === 'ready' ||
+      preview === 'listening' ||
+      preview === 'processing' ||
+      preview === 'error' ||
+      preview === 'cancelled'
+    ) {
+      if (preview === 'error') setErrorMessage(previewText);
+      setMode(preview);
     }
+    if (params.get('menu') === '1') setMenuOpen(true);
   }, []);
 
   useEffect(() => {
@@ -978,22 +734,20 @@ export const FloatingBar: React.FC = () => {
     void overlayService
       .getLayout()
       .then(applyLayout)
-      .catch(() => {
-        setOverlayStyle(readStoredOverlayStyle());
-      });
+      .catch(() => undefined);
 
     void invoke<AppConfig>('get_config')
       .then(config => {
-        setPttParts(hotkeyParts(config.hotkeys.push_to_talk));
-        setSttLanguage(config.runtime?.default_language ?? '');
-        setModelId(
-          config.ui?.selected_model || config.runtime?.llm_model || ''
-        );
+        // Keep hotkey available for accessibility labels even if idle UI hides it.
+        void hotkeyParts(config.hotkeys.push_to_talk);
         const stored = storedAutoInsert();
         const fromConfig = config.ui?.auto_insert !== false;
         setAutoInsert(stored ?? fromConfig);
         if (stored !== null && stored !== fromConfig && isTauriRuntime()) {
           void insertionService.setAutoInsert(stored).catch(() => undefined);
+        }
+        if (config.ui?.overlay_anchor) {
+          setAnchor(normalizeOverlayAnchor(config.ui.overlay_anchor));
         }
       })
       .catch(() => undefined);
@@ -1005,11 +759,7 @@ export const FloatingBar: React.FC = () => {
       };
       if (payload.state === 'recording') {
         expectingCancelRef.current = false;
-        setMode(
-          overlayStyleRef.current === 'pill' && compactPrefRef.current
-            ? 'compact'
-            : 'listening'
-        );
+        setMode('listening');
         setMenuOpen(false);
         setModal(null);
         setNotice(null);
@@ -1019,7 +769,6 @@ export const FloatingBar: React.FC = () => {
         expectingCancelRef.current = false;
         const nextMessage = payload.message?.trim() || 'status.processing';
         const { code } = parseCodedError(nextMessage);
-        // Only keep coded status.* keys in HUD state; raw debug lines stay in logs.
         setProcessingMessage(
           code.startsWith('status.') ? nextMessage : 'status.processing'
         );
@@ -1028,7 +777,6 @@ export const FloatingBar: React.FC = () => {
         return;
       }
       if (payload.state === 'done') {
-        // Pipeline already pasted. Don't reopen the result HUD on top of that.
         if (autoInsertRef.current) return;
         setMode('done');
         return;
@@ -1057,18 +805,17 @@ export const FloatingBar: React.FC = () => {
     const unlistenTranscription = listen('transcription-completed', event => {
       const payload = event.payload as HudTranscription;
       setMenuOpen(false);
-      // The pipeline pastes before this event. Inserting again here doubled the text.
       if (autoInsertRef.current && payload.text?.trim()) {
         expectingCancelRef.current = false;
         setMode('rest');
         setTranscription(null);
-        setNotice(null);
+        setNotice({ kind: 'insert', message: translate('hud.done') });
         setModal(null);
         return;
       }
       setTranscription(payload);
       setMode('done');
-      setNotice({ kind: 'insert', message: translate('hud.readyToInsert') });
+      setNotice(null);
     });
 
     const unlistenAudioLevel = listen('audio-level-updated', event => {
@@ -1097,34 +844,6 @@ export const FloatingBar: React.FC = () => {
       }
     );
 
-    const onStorage = (event: StorageEvent) => {
-      if (event.key !== OVERLAY_STYLE_STORAGE_KEY || !event.newValue) return;
-      applyLayout({
-        x: null,
-        y: null,
-        compact: compactPrefRef.current,
-        style: normalizeOverlayStyle(event.newValue),
-      });
-    };
-    window.addEventListener('storage', onStorage);
-
-    let channel: BroadcastChannel | null = null;
-    try {
-      channel = new BroadcastChannel(OVERLAY_STYLE_CHANNEL);
-      channel.onmessage = event => {
-        applyLayout({
-          x: null,
-          y: null,
-          compact: compactPrefRef.current,
-          style: normalizeOverlayStyle(
-            typeof event.data === 'string' ? event.data : undefined
-          ),
-        });
-      };
-    } catch {
-      channel = null;
-    }
-
     return () => {
       unlistenRecording.then(fn => fn()).catch(() => undefined);
       unlistenTranscription.then(fn => fn()).catch(() => undefined);
@@ -1132,8 +851,6 @@ export const FloatingBar: React.FC = () => {
       unlistenError.then(fn => fn()).catch(() => undefined);
       unlistenLog.then(fn => fn()).catch(() => undefined);
       unlistenLayout.then(fn => fn()).catch(() => undefined);
-      window.removeEventListener('storage', onStorage);
-      channel?.close();
     };
   }, [applyLayout, showError]);
 
@@ -1162,9 +879,11 @@ export const FloatingBar: React.FC = () => {
     return () => window.clearTimeout(timer);
   }, [notice]);
 
+  // Window follows mode/panel. Layout effect: schedule before paint so growth
+  // is in flight by the time the new content is visible.
   useLayoutEffect(() => {
     void syncOverlayFrame();
-  }, [overlayStyle, mode, notice, menuOpen, modal, syncOverlayFrame]);
+  }, [mode, panelKind, syncOverlayFrame]);
 
   useEffect(() => {
     const endPointer = () => {
@@ -1174,8 +893,7 @@ export const FloatingBar: React.FC = () => {
       }
       if (draggingRef.current) {
         draggingRef.current = false;
-        saveOverlayPosition();
-        void syncOverlayFrame();
+        void saveOverlayPosition().then(() => syncOverlayFrame());
       }
       if (
         !hoverRef.current &&
@@ -1192,14 +910,9 @@ export const FloatingBar: React.FC = () => {
       window.removeEventListener('pointerup', endPointer);
       window.removeEventListener('pointercancel', endPointer);
       window.clearTimeout(leaveTimerRef.current);
+      window.clearTimeout(shrinkTimerRef.current);
     };
   }, [leaveReady, saveOverlayPosition, syncOverlayFrame]);
-
-  useEffect(() => {
-    void readOverlayGeometry().then(geo => {
-      geometryRef.current = geo;
-    });
-  }, []);
 
   useEffect(() => {
     const win = currentOverlayWindow();
@@ -1210,11 +923,8 @@ export const FloatingBar: React.FC = () => {
       .onMoved(() => {
         window.clearTimeout(timer);
         timer = window.setTimeout(() => {
-          if (applyingRef.current) return;
-          saveOverlayPosition();
-          if (!draggingRef.current) {
-            void syncOverlayFrame();
-          }
+          if (applyingRef.current || draggingRef.current) return;
+          void saveOverlayPosition();
         }, 140);
       })
       .then(fn => {
@@ -1225,24 +935,32 @@ export const FloatingBar: React.FC = () => {
       window.clearTimeout(timer);
       unlisten?.();
     };
-  }, [saveOverlayPosition, syncOverlayFrame]);
+  }, [saveOverlayPosition]);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Enter' && !event.shiftKey) {
+        if (modal === 'edit') {
+          event.preventDefault();
+          void insertCurrent(draft);
+          return;
+        }
+        if ((mode === 'transcribed' || mode === 'actions') && !menuOpen) {
+          event.preventDefault();
+          void insertCurrent(transcription?.text ?? '');
+          return;
+        }
+      }
       if (event.key !== 'Escape') return;
       if (menuOpen || modal) {
         closeOverlays();
-        return;
-      }
-      if (PANEL_MODES.has(mode)) {
-        closePanel();
         return;
       }
       if (mode === 'cancelled' || mode === 'error' || RESULT_MODES.has(mode)) {
         returnToIdle();
         return;
       }
-      if (mode === 'listening' || mode === 'compact') {
+      if (mode === 'listening') {
         cancelRecording();
       }
     };
@@ -1251,26 +969,22 @@ export const FloatingBar: React.FC = () => {
   }, [
     cancelRecording,
     closeOverlays,
-    closePanel,
+    draft,
+    insertCurrent,
     menuOpen,
     modal,
     mode,
     returnToIdle,
+    transcription,
   ]);
 
   const sceneMode = sceneModeForHud(mode);
-  const openResultActions = () => {
-    if (overlayStyleRef.current === 'card') {
-      setMode('menu');
-      return;
-    }
-    setMode('actions');
-  };
+  const covered = panelKind !== null;
   const mascot = (
     <HudMascot
-      placement={mascotPlacement(overlayStyle, mode)}
       sceneMode={sceneMode}
       level={audioLevel}
+      active={mode === 'ready' || mode === 'listening' || mode === 'processing'}
       onMouseDown={beginChromeDrag}
       onPointerEnter={enterReady}
       onPointerLeave={leaveReady}
@@ -1278,201 +992,66 @@ export const FloatingBar: React.FC = () => {
     />
   );
 
-  const renderBody = () => {
-    const listeningVariant =
-      overlayStyle === 'island' || mode === 'compact' ? 'island' : 'pill';
-
-    if (overlayStyle === 'card') {
-      switch (mode) {
-        case 'rest':
-        case 'ready':
-          return (
-            <CardReadyContent
-              hotkeyParts={pttParts}
-              onStart={startRecording}
-              onNotes={() => startWithContext('Trabajo')}
-              onEmail={() => startWithContext('Comunicación')}
-              onIdea={() => startWithContext('Diseño')}
-              onMore={() => setMode('menu')}
-              onSettings={() => setMode('controls')}
-            />
-          );
-        case 'listening':
-        case 'compact':
-          return (
-            <CardListeningContent
-              audioLevel={audioLevel}
-              onStop={stopRecording}
-              onCancel={cancelRecording}
-            />
-          );
-        case 'processing':
-          return <CardProcessingContent message={processingMessage} />;
-        case 'done':
-          return <CardDoneContent />;
-        case 'transcribed':
-          return (
-            <CardTranscribedContent
-              text={transcription?.text ?? ''}
-              onInsert={() => void insertCurrent(transcription?.text ?? '')}
-              onCopy={copyAndDismiss}
-              onImprove={() => void improveCurrent()}
-              onSummarize={() =>
-                void rewriteCurrent(
-                  summarizePrompt(),
-                  t('hud.summarizingShort')
-                )
-              }
-              onTranslate={() =>
-                void rewriteCurrent(
-                  translatePrompt(),
-                  t('hud.translatingShort')
-                )
-              }
-              onOpenActions={() => setMode('menu')}
-              onClose={returnToIdle}
-              showTimeout={!reducedMotion && !menuOpen && !modal}
-            />
-          );
-        case 'actions':
-          return (
-            <CardActionsContent
-              text={transcription?.text ?? ''}
-              onInsert={() => void insertCurrent(transcription?.text ?? '')}
-              onCopy={copyAndDismiss}
-              onImprove={() => void improveCurrent()}
-              onClose={returnToIdle}
-              showTimeout={!reducedMotion && !menuOpen && !modal}
-            />
-          );
-        case 'menu':
-          return (
-            <CardMenuContent
-              hotkeyParts={pttParts}
-              onDictate={startRecording}
-              onNotes={() => startWithContext('Trabajo')}
-              onEmail={() => startWithContext('Comunicación')}
-              onIdea={() => startWithContext('Diseño')}
-              onList={() => startWithContext('Personal')}
-              onTranslate={() => startWithContext('Comunicación')}
-              onMore={openHistory}
-              onClose={closePanel}
-            />
-          );
-        case 'history':
-          return (
-            <CardHistoryContent
-              items={historyItems}
-              query={historyQuery}
-              onQueryChange={setHistoryQuery}
-              onOpenAll={openMainWindow}
-              onSelect={item => {
-                setTranscription({
-                  text: item.text,
-                  duration_ms: 0,
-                  model_used: '',
-                });
-                setMode('transcribed');
-                setNotice({
-                  kind: 'insert',
-                  message: t('hud.readyToInsert'),
-                });
-              }}
-              onClose={closePanel}
-              formatTime={createdAt => formatRelativeTime(createdAt)}
-            />
-          );
-        case 'controls':
-          return (
-            <CardControlsContent
-              modelLabel={friendlyModelLabel(modelId)}
-              languageLabel={languageLabelFor(sttLanguage)}
-              autoInsert={autoInsert}
-              onToggleAutoInsert={persistAutoInsert}
-              onShortcuts={openMainWindow}
-              onSettings={openMainWindow}
-              onClose={closePanel}
-            />
-          );
-        case 'cancelled':
-          return (
-            <CardCancelledContent
-              reducedMotion={reducedMotion}
-              onUndo={undoCancel}
-            />
-          );
-        case 'error':
-          return (
-            <CardErrorContent
-              message={errorMessage || t('common.genericError')}
-              onClose={returnToIdle}
-              onOpenApp={errorOpenApp ? openMainWindow : undefined}
-            />
-          );
-        default:
-          return null;
-      }
+  let toast: ReactNode = null;
+  if (!covered) {
+    if (mode === 'processing') {
+      toast = <ProcessingToast message={processingMessage} />;
+    } else if (mode === 'done') {
+      toast = <HudToast message={t('hud.done')} />;
+    } else if (notice) {
+      toast = <HudToast kind={notice.kind} message={notice.message} />;
     }
+  }
 
-    switch (mode) {
-      case 'ready':
-        return <ReadyContent hotkeyParts={pttParts} onStart={startRecording} />;
-      case 'listening':
+  const renderPanel = (): ReactNode => {
+    switch (panelKind) {
+      case 'edit':
         return (
-          <ListeningContent
-            variant={listeningVariant}
-            audioLevel={audioLevel}
-            onStop={stopRecording}
-            onCancel={cancelRecording}
-          />
-        );
-      case 'processing':
-        return <ProcessingContent message={processingMessage} />;
-      case 'done':
-        return <DoneContent />;
-      case 'transcribed':
-        return (
-          <TranscribedContent
-            text={transcription?.text ?? ''}
-            onInsert={() => void insertCurrent(transcription?.text ?? '')}
-            onOpenActions={openResultActions}
-            onClose={returnToIdle}
-            showTimeout={!reducedMotion && !menuOpen && !modal}
-          />
-        );
-      case 'actions':
-        return (
-          <ActionsContent
-            text={transcription?.text ?? ''}
-            menuOpen={menuOpen}
-            onCopy={copyAndDismiss}
-            onImprove={() => void improveCurrent()}
-            onToggleMenu={() => setMenuOpen(open => !open)}
-            onClose={returnToIdle}
-            showTimeout={!reducedMotion && !menuOpen && !modal}
+          <HudModal
+            draft={draft}
+            onDraftChange={setDraft}
+            onClose={() => setModal(null)}
+            onInsert={() => void insertCurrent(draft)}
           />
         );
       case 'menu':
-      case 'history':
-      case 'controls':
-        return overlayStyle === 'island' ? (
-          <ReadyContent hotkeyParts={pttParts} onStart={startRecording} />
-        ) : null;
-      case 'compact':
         return (
-          <CompactContent
-            audioLevel={audioLevel}
-            onStop={stopRecording}
-            onCancel={cancelRecording}
+          <HudQuickMenu
+            anchor={anchor}
+            onOpenApp={openMainWindow}
+            onLastMurmur={() => void showLastMurmur()}
+            onSettings={openMainWindow}
+            onAnchor={snapToAnchor}
+            onExit={exitOverlay}
+            onClose={() => setMenuOpen(false)}
           />
         );
-      case 'cancelled':
+      case 'result':
         return (
-          <CancelledContent reducedMotion={reducedMotion} onUndo={undoCancel} />
+          <ResultPanel
+            text={transcription?.text ?? ''}
+            onInsert={() => void insertCurrent(transcription?.text ?? '')}
+            onCopy={copyAndDismiss}
+            onEdit={() => {
+              setDraft(transcription?.text ?? '');
+              setModal('edit');
+            }}
+            onClose={returnToIdle}
+            showTimeout={!reducedMotion}
+          />
         );
-      case 'error':
+      case 'notice':
+        if (mode === 'cancelled') {
+          return (
+            <CancelledPanel
+              reducedMotion={reducedMotion}
+              onUndo={undoCancel}
+              onClose={returnToIdle}
+            />
+          );
+        }
         return (
-          <ErrorContent
+          <ErrorPanel
             message={errorMessage || t('common.genericError')}
             onClose={returnToIdle}
             onOpenApp={errorOpenApp ? openMainWindow : undefined}
@@ -1483,78 +1062,57 @@ export const FloatingBar: React.FC = () => {
     }
   };
 
-  const extrasHeight = overlayExtrasHeight(overlayStyle, mode, extras);
-  const stackAbove =
-    extrasHeight > 0 &&
-    (geometryRef.current
-      ? placementForGeometry(
-          overlayStyle,
-          mode,
-          extras,
-          geometryRef.current,
-          shiftRef.current
-        ) === 'above'
-      : placement === 'above');
-  const pinWindowBottom = stackAbove && isTauriRuntime();
+  // The panel waits until the native window is large enough for it.
+  const panelOpen =
+    panelKind !== null &&
+    (!isTauriRuntime() ||
+      sizeFits(appliedSize, overlayWindowSize(mode, panelKind)));
+  const stage = stageSizeForMode(mode);
 
   return (
     <div
-      className={`floating-bar-container hud-style-${overlayStyle}${pinWindowBottom ? ' is-above' : ''}${reducedMotion ? ' hud-reduced' : ''}`}
+      className={`floating-bar-container${reducedMotion ? ' hud-reduced' : ''}`}
     >
-      <div
-        className={`hud-column${stackAbove ? ' is-above' : ''}`}
-        data-placement={stackAbove ? 'above' : 'below'}
-      >
-        <HudStage
-          style={overlayStyle}
-          mode={mode}
-          width={contentSize(overlayStyle, mode).width}
-          mascot={mascot}
-          onMouseDown={beginChromeDrag}
-          onPointerEnter={enterReady}
-          onPointerLeave={leaveReady}
-        >
-          {renderBody()}
-        </HudStage>
-        <HudLayer
-          open={
-            overlayStyle !== 'card' &&
-            notice !== null &&
-            notice.kind === 'insert'
-          }
-          reducedMotion={reducedMotion}
-          className=""
-        >
-          {notice?.kind === 'insert' ? (
-            <HudToast kind={notice.kind} message={notice.message} />
-          ) : null}
-        </HudLayer>
-        <HudLayer open={menuOpen} reducedMotion={reducedMotion} className="">
-          <HudQuickMenu
-            compact={compactPref}
-            showCompactToggle={overlayStyle === 'pill'}
-            onOpenApp={openMainWindow}
-            onLastMurmur={() => void showLastMurmur()}
-            onSettings={openMainWindow}
-            onToggleCompact={toggleCompactPref}
-            onExit={exitOverlay}
-          />
-        </HudLayer>
-        <HudLayer
-          open={modal === 'edit'}
-          reducedMotion={reducedMotion}
-          className=""
-        >
-          {modal === 'edit' ? (
-            <HudModal
-              draft={draft}
-              onDraftChange={setDraft}
-              onClose={() => setModal(null)}
-              onInsert={() => void insertCurrent(draft)}
+      <HudStage
+        mode={mode}
+        width={stage.width}
+        height={stage.height}
+        covered={covered}
+        mascot={mascot}
+        orbitals={
+          <>
+            <ReadyOrbitals
+              visible={mode === 'ready' && !covered}
+              onAction={handleOrbital}
             />
-          ) : null}
-        </HudLayer>
-      </div>
+            <ListeningOrbitals
+              visible={mode === 'listening' && !covered}
+              onAction={handleOrbital}
+            />
+          </>
+        }
+        toast={
+          <HudLayer
+            open={toast !== null}
+            reducedMotion={reducedMotion}
+            className="hud-toast-layer"
+          >
+            {toast}
+          </HudLayer>
+        }
+        onMouseDown={beginChromeDrag}
+        onPointerEnter={enterReady}
+        onPointerLeave={leaveReady}
+      />
+      <HudPanel
+        open={panelOpen}
+        kind={panelKind ?? lastPanelRef.current}
+        mascot={mascotPoint}
+        work={work}
+        reducedMotion={reducedMotion}
+      >
+        {renderPanel()}
+      </HudPanel>
     </div>
   );
 };

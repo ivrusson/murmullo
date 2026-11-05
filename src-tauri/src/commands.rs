@@ -1238,9 +1238,14 @@ pub async fn update_hotkey_config(
 }
 
 const FLOATING_BAR_LABEL: &str = "floating-bar";
-const FLOATING_BAR_WIDTH: f64 = 560.0;
-const FLOATING_BAR_HEIGHT: f64 = 168.0;
-const FLOATING_BAR_BOTTOM_MARGIN: f64 = 24.0;
+/// Resting overlay window: mascot (96) + stage padding (28) + shadow pad (40).
+/// The window is always symmetric around the mascot center; the frontend
+/// grows it from there. Keep in sync with overlayFrame.ts.
+const FLOATING_BAR_WIDTH: f64 = 164.0;
+const FLOATING_BAR_HEIGHT: f64 = 164.0;
+const FLOATING_BAR_MASCOT_HALF: f64 = 48.0;
+/// Gap between the mascot's visible edge and the work-area edge (overlayAnchor.ts).
+const FLOATING_BAR_EDGE_MARGIN: f64 = 16.0;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OverlayLayout {
@@ -1248,9 +1253,15 @@ pub struct OverlayLayout {
     pub y: Option<f64>,
     pub compact: bool,
     pub style: String,
+    #[serde(default = "default_layout_anchor")]
+    pub anchor: String,
 }
 
-fn floating_bar_anchor(app: &tauri::AppHandle) -> Result<(f64, f64), String> {
+fn default_layout_anchor() -> String {
+    "bottom".to_string()
+}
+
+fn primary_work_area(app: &tauri::AppHandle) -> Result<(f64, f64, f64, f64), String> {
     let monitor = app
         .primary_monitor()
         .map_err(|e| format!("primary monitor: {e}"))?
@@ -1262,9 +1273,48 @@ fn floating_bar_anchor(app: &tauri::AppHandle) -> Result<(f64, f64), String> {
     let work = monitor.work_area();
     let origin = work.position.to_logical::<f64>(scale);
     let area = work.size.to_logical::<f64>(scale);
-    let x = origin.x + ((area.width - FLOATING_BAR_WIDTH) / 2.0).max(0.0);
-    let y = origin.y + (area.height - FLOATING_BAR_HEIGHT - FLOATING_BAR_BOTTOM_MARGIN).max(0.0);
-    Ok((x, y))
+    Ok((origin.x, origin.y, area.width, area.height))
+}
+
+/// Mascot center for a cardinal edge, centered along that edge.
+/// Mirrors mascotPointForAnchor() in overlayAnchor.ts.
+fn floating_bar_center_for_anchor(
+    app: &tauri::AppHandle,
+    anchor: &str,
+) -> Result<(f64, f64), String> {
+    let (ox, oy, aw, ah) = primary_work_area(app)?;
+    let margin = FLOATING_BAR_EDGE_MARGIN;
+    let half = FLOATING_BAR_MASCOT_HALF;
+    let center_x = ox + aw / 2.0;
+    let center_y = oy + ah / 2.0;
+    Ok(match anchor {
+        "top" => (center_x, oy + margin + half),
+        "left" => (ox + margin + half, center_y),
+        "right" => (ox + aw - margin - half, center_y),
+        _ => (center_x, oy + ah - margin - half),
+    })
+}
+
+/// Window origin for the resting window around a mascot center.
+fn floating_bar_origin_for_center(cx: f64, cy: f64) -> (f64, f64) {
+    (
+        (cx - FLOATING_BAR_WIDTH / 2.0).round(),
+        (cy - FLOATING_BAR_HEIGHT / 2.0).round(),
+    )
+}
+
+fn floating_bar_anchor(app: &tauri::AppHandle) -> Result<(f64, f64), String> {
+    let state = app.state::<AppState>();
+    let anchor = state
+        .config
+        .lock()
+        .ok()
+        .map(|config| crate::config::normalize_overlay_anchor(&config.ui.overlay_anchor))
+        .unwrap_or_else(|| "bottom".to_string());
+    if anchor == "custom" {
+        return floating_bar_center_for_anchor(app, "bottom");
+    }
+    floating_bar_center_for_anchor(app, &anchor)
 }
 
 fn overlay_saved_position(app: &tauri::AppHandle) -> Option<(f64, f64)> {
@@ -1296,9 +1346,25 @@ fn point_in_any_work_area(app: &tauri::AppHandle, x: f64, y: f64) -> bool {
     false
 }
 
-/// Restore a saved overlay origin when it still sits on a monitor.
-/// Otherwise use bottom-center once and persist it so later shows do not re-anchor.
-fn resolve_overlay_position(app: &tauri::AppHandle) -> Result<(f64, f64, bool), String> {
+fn overlay_saved_anchor(app: &tauri::AppHandle) -> String {
+    let state = app.state::<AppState>();
+    state
+        .config
+        .lock()
+        .ok()
+        .map(|config| crate::config::normalize_overlay_anchor(&config.ui.overlay_anchor))
+        .unwrap_or_else(|| "bottom".to_string())
+}
+
+/// Restore the saved mascot center when it still sits on a monitor.
+/// Cardinal anchors recompute from the current work area so edge snaps stay valid.
+/// Otherwise use the configured edge once and persist it so later shows do not re-anchor.
+fn resolve_overlay_center(app: &tauri::AppHandle) -> Result<(f64, f64, bool), String> {
+    let anchor = overlay_saved_anchor(app);
+    if anchor != "custom" {
+        let (x, y) = floating_bar_center_for_anchor(app, &anchor)?;
+        return Ok((x, y, true));
+    }
     if let Some((x, y)) = overlay_saved_position(app) {
         if point_in_any_work_area(app, x, y) {
             return Ok((x, y, false));
@@ -1317,11 +1383,19 @@ fn persist_overlay_position(app: &tauri::AppHandle, x: f64, y: f64) -> Result<()
 }
 
 fn show_floating_bar(win: &tauri::WebviewWindow) -> Result<(), String> {
-    let (x, y, persist) = resolve_overlay_position(win.app_handle())?;
+    let (cx, cy, persist) = resolve_overlay_center(win.app_handle())?;
+    let (x, y) = floating_bar_origin_for_center(cx, cy);
+    // Resting size first (top-left preserved), then the origin for that size.
+    // This runs on the main thread, so the atomic path is not available here.
+    win.set_size(tauri::LogicalSize::new(
+        FLOATING_BAR_WIDTH,
+        FLOATING_BAR_HEIGHT,
+    ))
+    .map_err(|e| format!("set overlay size: {e}"))?;
     win.set_position(tauri::LogicalPosition::new(x, y))
         .map_err(|e| format!("set overlay position: {e}"))?;
     if persist {
-        persist_overlay_position(win.app_handle(), x, y)?;
+        persist_overlay_position(win.app_handle(), cx, cy)?;
     }
     win.set_always_on_top(true)
         .map_err(|e| format!("set overlay always-on-top: {e}"))?;
@@ -1356,7 +1430,8 @@ pub fn ensure_floating_bar_window(app_handle: &tauri::AppHandle) -> Result<(), S
         return Ok(());
     }
 
-    let (x, y, _) = resolve_overlay_position(app_handle)?;
+    let (cx, cy, _) = resolve_overlay_center(app_handle)?;
+    let (x, y) = floating_bar_origin_for_center(cx, cy);
     let win = tauri::WebviewWindowBuilder::new(
         app_handle,
         FLOATING_BAR_LABEL,
@@ -1375,7 +1450,6 @@ pub fn ensure_floating_bar_window(app_handle: &tauri::AppHandle) -> Result<(), S
     .visible(true)
     .inner_size(FLOATING_BAR_WIDTH, FLOATING_BAR_HEIGHT)
     .position(x, y)
-    .prevent_overflow()
     .user_agent("MurmulloFloatingBar/1.0")
     .initialization_script(crate::crash::FRONTEND_CAPTURE_SCRIPT)
     .build()
@@ -1395,6 +1469,7 @@ pub async fn create_floating_bar_window(app_handle: tauri::AppHandle) -> Result<
 pub async fn save_overlay_position(
     x: f64,
     y: f64,
+    mark_custom: Option<bool>,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
     if !x.is_finite() || !y.is_finite() {
@@ -1402,6 +1477,10 @@ pub async fn save_overlay_position(
     }
     let mut config = state.config.lock().map_err(|e| e.to_string())?;
     config.update_overlay_position(x, y);
+    // Free drag leaves the cardinal snap; position is absolute until the user picks an edge again.
+    if mark_custom.unwrap_or(true) {
+        config.update_overlay_anchor("custom".to_string());
+    }
     config.save().map_err(|e| e.to_string())?;
     Ok(())
 }
@@ -1412,6 +1491,7 @@ fn current_overlay_layout(config: &AppConfig) -> OverlayLayout {
         y: config.ui.overlay_y,
         compact: config.ui.overlay_compact,
         style: crate::config::normalize_overlay_style(&config.ui.overlay_style),
+        anchor: crate::config::normalize_overlay_anchor(&config.ui.overlay_anchor),
     }
 }
 
@@ -1462,6 +1542,150 @@ pub async fn set_overlay_style(
     Ok(layout)
 }
 
+/// Persist a cardinal edge (or `custom`) and the mascot center for it.
+/// The overlay frontend moves its own window; when no point is given
+/// (no frontend involved) the resting window is moved here instead.
+#[tauri::command]
+pub async fn set_overlay_anchor(
+    anchor: String,
+    x: Option<f64>,
+    y: Option<f64>,
+    app_handle: tauri::AppHandle,
+    state: State<'_, AppState>,
+) -> Result<OverlayLayout, String> {
+    match anchor.as_str() {
+        "top" | "bottom" | "left" | "right" | "custom" => {}
+        _ => return Err(crate::codes::code("overlay.invalid_position")),
+    }
+    if matches!(x, Some(v) if !v.is_finite()) || matches!(y, Some(v) if !v.is_finite()) {
+        return Err(crate::codes::code("overlay.invalid_position"));
+    }
+
+    let given = match (x, y) {
+        (Some(x), Some(y)) => Some((x, y)),
+        _ => None,
+    };
+    let (cx, cy) = match given {
+        Some(point) => point,
+        None if anchor == "custom" => overlay_saved_position(&app_handle).unwrap_or((0.0, 0.0)),
+        None => floating_bar_center_for_anchor(&app_handle, &anchor)?,
+    };
+
+    let layout = {
+        let mut config = state.config.lock().map_err(|e| e.to_string())?;
+        config.update_overlay_anchor(anchor.clone());
+        if cx.is_finite() && cy.is_finite() {
+            config.update_overlay_position(cx, cy);
+        }
+        config.save().map_err(|e| e.to_string())?;
+        current_overlay_layout(&config)
+    };
+
+    if given.is_none() && anchor != "custom" {
+        if let Some(win) = app_handle.get_webview_window(FLOATING_BAR_LABEL) {
+            let (ox, oy) = floating_bar_origin_for_center(cx, cy);
+            let _ = win.set_size(tauri::LogicalSize::new(
+                FLOATING_BAR_WIDTH,
+                FLOATING_BAR_HEIGHT,
+            ));
+            let _ = win.set_position(tauri::LogicalPosition::new(ox, oy));
+        }
+    }
+
+    emit_overlay_layout(&app_handle, &layout);
+    Ok(layout)
+}
+
+/// Apply origin and size in one native call so the webview never paints an
+/// intermediate frame (new size at the old origin) between two IPC steps.
+/// Coordinates are logical top-left, like `set_position`; the AppKit origin
+/// is derived from the current frame so no screen-height flip is needed.
+#[cfg(target_os = "macos")]
+fn set_overlay_frame_atomic(
+    win: &tauri::WebviewWindow,
+    next_x: f64,
+    next_y: f64,
+    width: f64,
+    height: f64,
+) -> Result<(), String> {
+    use objc2_app_kit::NSWindow;
+    use objc2_foundation::{NSPoint, NSRect, NSSize};
+
+    let scale = win.scale_factor().unwrap_or(1.0);
+    let scale = if scale > 0.0 { scale } else { 1.0 };
+    let current = win
+        .outer_position()
+        .map_err(|e| format!("read overlay position: {e}"))?;
+    let current_x = current.x as f64 / scale;
+    let current_y = current.y as f64 / scale;
+    let dx = next_x - current_x;
+    let dy = next_y - current_y;
+
+    let handle = win.clone();
+    let (tx, rx) = std::sync::mpsc::channel::<Result<(), String>>();
+    win.run_on_main_thread(move || {
+        let result = (|| {
+            let ptr = handle
+                .ns_window()
+                .map_err(|e| format!("overlay ns_window: {e}"))?;
+            if ptr.is_null() {
+                return Err("overlay ns_window is null".to_string());
+            }
+            // SAFETY: Tauri hands back the live NSWindow for this webview window
+            // and we are on the main thread, which is where AppKit expects
+            // frame mutations.
+            let window: &NSWindow = unsafe { &*(ptr as *const NSWindow) };
+            let frame = window.frame();
+            // AppKit y grows upward: keep the top edge, then shift by dy.
+            let top = frame.origin.y + frame.size.height;
+            let next = NSRect::new(
+                NSPoint::new(frame.origin.x + dx, top - dy - height),
+                NSSize::new(width, height),
+            );
+            window.setFrame_display(next, true);
+            Ok(())
+        })();
+        let _ = tx.send(result);
+    })
+    .map_err(|e| format!("overlay main thread: {e}"))?;
+
+    match rx.recv_timeout(std::time::Duration::from_secs(2)) {
+        Ok(result) => result,
+        Err(_) => Err("overlay frame update timed out".to_string()),
+    }
+}
+
+#[cfg(not(target_os = "macos"))]
+fn set_overlay_frame_atomic(
+    win: &tauri::WebviewWindow,
+    next_x: f64,
+    next_y: f64,
+    width: f64,
+    height: f64,
+) -> Result<(), String> {
+    let scale = win.scale_factor().unwrap_or(1.0);
+    let scale = if scale > 0.0 { scale } else { 1.0 };
+    let current_y = win
+        .outer_position()
+        .ok()
+        .map(|position| position.y as f64 / scale)
+        .unwrap_or(0.0);
+    let moving_up = next_y < current_y - 0.5;
+
+    if moving_up {
+        win.set_position(tauri::LogicalPosition::new(next_x, next_y))
+            .map_err(|e| format!("set overlay position: {e}"))?;
+        win.set_size(tauri::LogicalSize::new(width, height))
+            .map_err(|e| format!("set overlay size: {e}"))?;
+    } else {
+        win.set_size(tauri::LogicalSize::new(width, height))
+            .map_err(|e| format!("set overlay size: {e}"))?;
+        win.set_position(tauri::LogicalPosition::new(next_x, next_y))
+            .map_err(|e| format!("set overlay position: {e}"))?;
+    }
+    Ok(())
+}
+
 #[tauri::command]
 pub async fn resize_overlay(
     width: f64,
@@ -1499,20 +1723,8 @@ pub async fn resize_overlay(
         .unwrap_or(0.0);
     let next_x = x.unwrap_or(current_x);
     let next_y = y.unwrap_or(current_y);
-    let moving_up = next_y < current_y - 0.5;
 
-    if moving_up {
-        win.set_position(tauri::LogicalPosition::new(next_x, next_y))
-            .map_err(|e| format!("set overlay position: {e}"))?;
-        win.set_size(tauri::LogicalSize::new(width, height))
-            .map_err(|e| format!("set overlay size: {e}"))?;
-    } else {
-        win.set_size(tauri::LogicalSize::new(width, height))
-            .map_err(|e| format!("set overlay size: {e}"))?;
-        win.set_position(tauri::LogicalPosition::new(next_x, next_y))
-            .map_err(|e| format!("set overlay position: {e}"))?;
-    }
-    Ok(())
+    set_overlay_frame_atomic(&win, next_x, next_y, width, height)
 }
 
 #[tauri::command]

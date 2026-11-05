@@ -9,6 +9,33 @@ Murmullo is still **beta**. Versions stay on the `0.x` line until the product is
 
 ## [Unreleased]
 
+### Added
+
+- **Cardinal screen position from the overlay menu.** Top, bottom, left, or right snaps Murmullo to
+  that edge; dragging freely marks the position as custom until you pick an edge again.
+
+### Changed
+
+- **The floating bar is a presence, not a capsule.** At rest only the mascot shows; hover slides two
+  orbital actions (dictate, more) out from behind it; listening swaps them for cancel / stop.
+  Processing and done show a small toast above the mascot. Results, errors, cancellations, the edit
+  form, and the quick menu are centered panels that cover the mascot and leave it in place when
+  closed.
+- **Settings no longer offers overlay style variants** (pill / island / card). Presence and position
+  live with the mascot; Settings still has Show Murmullo if you quit the overlay.
+- **The mascot stays put, exactly.** The overlay window is always symmetric around the mascot
+  center, on macOS it moves and resizes in a single native frame update, and it only shrinks after
+  leave animations finish. Hovering, panels, menus, and toasts never nudge the mascot.
+- **Glow instead of a dropped shadow.** The mascot floats, so it carries a centered glow that pulses
+  while listening and processing; panels use a soft centered glow too.
+- **Edge snapping is measured from the mascot.** Top / bottom / left / right place the mascot's edge
+  16px from the work-area edge, and the saved position is the mascot center (previously the window
+  corner, so a position saved by an older build may land slightly off once).
+
+### Removed
+
+- Pill, Island, and Card floating-bar layouts, plus the compact-bar toggle in the overlay menu.
+
 ## [0.9.0] - 2026-10-13
 
 ### Added

@@ -1,6 +1,6 @@
 /** Chrome that should receive clicks and window drags. */
 export const HUD_HIT_SELECTOR =
-  '[data-hud-hit], .hud-pill, .hud-card, .hud-mascot, .hud-mascot-rest, .hud-mascot-perch, .hud-toast, .hud-menu, .hud-modal';
+  '[data-hud-hit], .hud-stage, .hud-mascot, .hud-panel, .hud-orbital, .hud-toast, .hud-menu, .hud-modal';
 
 /** Samples closer than this are the same CSS point, allowing for rounding. */
 export const CURSOR_SAMPLE_MATCH_PX = 24;

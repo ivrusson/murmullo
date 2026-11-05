@@ -80,9 +80,12 @@ export interface OverlayLayout {
   y: number | null;
   compact: boolean;
   style?: OverlayStyle;
+  anchor?: OverlayAnchor;
 }
 
 export type OverlayStyle = 'pill' | 'island' | 'card';
+
+export type OverlayAnchor = 'top' | 'bottom' | 'left' | 'right' | 'custom';
 
 export interface UiConfig {
   theme: ThemePreference;
@@ -92,6 +95,7 @@ export interface UiConfig {
   selected_model?: string;
   overlay_x?: number | null;
   overlay_y?: number | null;
+  overlay_anchor?: OverlayAnchor;
   overlay_compact?: boolean;
   overlay_style?: OverlayStyle;
   auto_insert?: boolean;

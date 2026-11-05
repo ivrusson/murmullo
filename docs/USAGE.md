@@ -174,10 +174,11 @@ Do not try to “train” Parakeet. Fix the word here.
 
 **Settings → Interface language:** Español (España) or English. Default is Spanish.
 
-**Settings → Floating bar:** Pill (compact at rest), Island, or Card. If you quit the overlay, show
-it again here or press Dictate.
+**Settings → Desktop presence:** show the floating mascot again if you quit the overlay, or press
+Dictate. At rest only the mascot is visible; hover reveals actions. Right-click (or More) opens the
+overlay menu, including screen position: top, bottom, left, or right.
 
-The overlay can be dragged. Placement is stored in config.
+The overlay can be dragged. Edge snaps and free placement are stored in config.
 
 ### Files on disk
 

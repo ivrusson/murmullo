@@ -6,6 +6,7 @@ import type {
   AudioLevel,
   InsertionMode,
   AppConfig,
+  OverlayAnchor,
   OverlayLayout,
   OverlayStyle,
   RuntimeStatus,
@@ -204,8 +205,12 @@ export const overlayService = {
   async show(): Promise<void> {
     return await invoke('create_floating_bar_window');
   },
-  async savePosition(x: number, y: number): Promise<void> {
-    return await invoke('save_overlay_position', { x, y });
+  async savePosition(x: number, y: number, markCustom = true): Promise<void> {
+    return await invoke('save_overlay_position', {
+      x,
+      y,
+      markCustom,
+    });
   },
   async getLayout(): Promise<OverlayLayout> {
     return await invoke('get_overlay_layout');
@@ -215,6 +220,18 @@ export const overlayService = {
   },
   async setStyle(style: OverlayStyle): Promise<OverlayLayout> {
     return await invoke('set_overlay_style', { style });
+  },
+  /** Persist an edge (or custom) with the mascot center it maps to. */
+  async setAnchor(
+    anchor: OverlayAnchor,
+    x?: number,
+    y?: number
+  ): Promise<OverlayLayout> {
+    return await invoke('set_overlay_anchor', {
+      anchor,
+      x: x ?? null,
+      y: y ?? null,
+    });
   },
   async resize(
     width: number,
