@@ -9,6 +9,8 @@ Murmullo is still **beta**. Versions stay on the `0.x` line until the product is
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-11-05
+
 ### Added
 
 - **Cardinal screen position from the overlay menu.** Top, bottom, left, or right snaps Murmullo to
