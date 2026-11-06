@@ -785,7 +785,7 @@ prefetch_release() {
     if [ -n "$STATUS_FILE" ] && [ -f "$ROOT/scripts/update-progress.mjs" ]; then
       if ! pnpm fetch --dir "$_stage" --reporter=ndjson 2>&1 \
         | node "$ROOT/scripts/update-progress.mjs" \
-        | while IFS= read -r _pct _detail; do
+        | while read -r _pct _detail; do
           status downloading "$((20 + _pct * 65 / 100))" "$_detail"
         done; then
         rm -rf "$_stage"
