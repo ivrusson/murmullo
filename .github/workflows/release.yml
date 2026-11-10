@@ -1,48 +1,105 @@
 name: Release Pipeline
 
-# Manual only. Pushing a tag used to start this, but the build has failed on every tag since
-# v0.1.0 and the installers are not signed yet. Start it from the Actions tab when that is fixed.
+# Pushing a `v*` tag builds the macOS installers (Apple Silicon + Intel), signs them with the
+# self-signed Murmullo identity and publishes the release. A tag containing `-` (v0.11.0-beta.1)
+# is a pre-release.
+#
+# The release stays a draft until every target has built and been checked, so a failing target
+# never leaves a half-published release. latest.json is published last, to the release itself and
+# to the permanent `updater-manifest` release that the app's updater endpoint points at
+# (/releases/latest ignores pre-releases, so it cannot host the manifest).
+#
+# To retry a tag that already exists, run this workflow from the Actions tab and type the tag.
 on:
+  push:
+    tags:
+      - 'v*'
   workflow_dispatch:
     inputs:
-      version:
-        description: 'Version to release (e.g., 1.0.0)'
+      tag:
+        description: 'Existing tag to (re)build and publish (e.g., v0.11.0-beta.1)'
         required: true
         type: string
-      platform:
-        description: 'Platform to build for'
-        required: false
-        default: 'all'
-        type: choice
-        options:
-          - all
-          - macos
-          - windows
-          - linux
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+env:
+  TAG: ${{ inputs.tag || github.ref_name }}
+  SIGNING_IDENTITY: Murmullo Self-Signed Code Signing
 
 jobs:
-  build-and-release:
-    runs-on: ${{ matrix.os }}
+  draft-release:
+    name: Prepare draft release
+    runs-on: ubuntu-latest
+    outputs:
+      release_id: ${{ steps.draft.outputs.release_id }}
+      prerelease: ${{ steps.draft.outputs.prerelease }}
+    steps:
+      - name: Create or reuse the draft release
+        id: draft
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          if ! [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-.+)?$ ]]; then
+            echo "::error::'$TAG' is not a release tag (expected vX.Y.Z or vX.Y.Z-pre)"
+            exit 1
+          fi
+          if gh api "repos/$GH_REPO/git/ref/tags/$TAG" --silent; then :; else
+            echo "::error::Tag $TAG does not exist"
+            exit 1
+          fi
+
+          prerelease=false
+          [[ "$TAG" == *-* ]] && prerelease=true
+
+          # Drafts are not found by tag with `gh release view`, so look through the list.
+          find_id() {
+            gh api "repos/$GH_REPO/releases" --paginate \
+              --jq ".[] | select(.tag_name == \"$TAG\") | .id" | head -n1
+          }
+
+          release_id=$(find_id)
+          if [ -z "$release_id" ]; then
+            flags=(--draft --verify-tag)
+            [ "$prerelease" = true ] && flags+=(--prerelease)
+            gh release create "$TAG" "${flags[@]}" \
+              --title "Murmullo $TAG" \
+              --notes "See [CHANGELOG.md](https://github.com/$GH_REPO/blob/$TAG/CHANGELOG.md) for details."
+            release_id=$(find_id)
+          else
+            # A release made by hand or by release-it is published and empty until the build ends:
+            # pull it back to draft so it only goes public once complete.
+            gh api -X PATCH "repos/$GH_REPO/releases/$release_id" \
+              -F draft=true -F prerelease=$prerelease --silent
+          fi
+
+          echo "release_id=$release_id" >> "$GITHUB_OUTPUT"
+          echo "prerelease=$prerelease" >> "$GITHUB_OUTPUT"
+
+  build:
+    name: Build ${{ matrix.target }}
+    needs: draft-release
+    runs-on: macos-latest
     strategy:
+      fail-fast: false
       matrix:
-        os: [macos-latest, ubuntu-latest, windows-latest]
         include:
-          - os: macos-latest
-            platform: macos
-            arch: x64
-          - os: macos-latest
-            platform: macos
-            arch: aarch64
-          - os: ubuntu-latest
-            platform: linux
-            arch: x64
-          - os: windows-latest
-            platform: windows
-            arch: x64
+          - target: aarch64-apple-darwin
+            lipo_arch: arm64
+          - target: x86_64-apple-darwin
+            lipo_arch: x86_64
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
 
       - name: Install pnpm
         uses: pnpm/action-setup@v4
@@ -58,85 +115,163 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          components: rustfmt, clippy
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+
+      - name: Cache Rust build
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+          key: ${{ matrix.target }}
 
       - name: Install dependencies
-        run: pnpm install
+        run: pnpm install --frozen-lockfile
 
-      - name: Build frontend
-        run: pnpm run build
+      - name: Import signing certificate
+        env:
+          MACOS_CERT_P12: ${{ secrets.MACOS_CERT_P12 }}
+          MACOS_CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
+        run: |
+          keychain="$RUNNER_TEMP/murmullo-signing.keychain-db"
+          keychain_password=$(uuidgen)
+          cert="$RUNNER_TEMP/murmullo-signing.p12"
 
-      - name: Build Tauri app
+          echo "$MACOS_CERT_P12" | base64 --decode > "$cert"
+
+          security create-keychain -p "$keychain_password" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$keychain_password" "$keychain"
+          security import "$cert" -P "$MACOS_CERT_PASSWORD" -A -t cert -f pkcs12 -k "$keychain"
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$keychain_password" "$keychain" > /dev/null
+          # shellcheck disable=SC2046
+          security list-keychains -d user -s "$keychain" $(security list-keychains -d user | tr -d '"')
+
+          # A self-signed certificate is not trusted by default; without trust codesign may refuse it.
+          openssl pkcs12 -in "$cert" -passin env:MACOS_CERT_PASSWORD -nokeys \
+            | openssl x509 > "$RUNNER_TEMP/murmullo-signing.pem"
+          sudo security add-trusted-cert -d -r trustRoot -p codeSign -k "$keychain" \
+            "$RUNNER_TEMP/murmullo-signing.pem" \
+            || echo "::warning::Could not mark the certificate as trusted for code signing"
+
+          rm -f "$cert" "$RUNNER_TEMP/murmullo-signing.pem"
+          security find-identity -p codesigning "$keychain" | grep -F "$SIGNING_IDENTITY" > /dev/null \
+            || { echo "::error::Identity '$SIGNING_IDENTITY' not found in the imported certificate"; exit 1; }
+
+      - name: Build and upload to the draft release
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          APPLE_SIGNING_IDENTITY: ${{ env.SIGNING_IDENTITY }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
-          tagName: ${{ github.ref_name }}
-          releaseName: 'Murmullo v__VERSION__'
-          releaseBody: 'See CHANGELOG.md for details'
-          releaseDraft: false
-          prerelease: false
+          tagName: ${{ env.TAG }}
+          releaseId: ${{ needs.draft-release.outputs.release_id }}
+          releaseDraft: true
+          prerelease: ${{ needs.draft-release.outputs.prerelease == 'true' }}
+          # latest.json needs both architectures: the publish job writes it.
+          uploadUpdaterJson: false
+          args: --target ${{ matrix.target }}
 
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: murmullo-${{ matrix.platform }}-${{ matrix.arch }}
-          path: src-tauri/target/release/bundle/
-          retention-days: 30
+      - name: Verify architecture and signature
+        run: |
+          bundle="src-tauri/target/${{ matrix.target }}/release/bundle"
+          app="$bundle/macos/Murmullo.app"
 
-  create-release:
-    needs: build-and-release
+          archs=$(lipo -archs "$app/Contents/MacOS/"*)
+          echo "lipo -archs: $archs"
+          [ "$archs" = "${{ matrix.lipo_arch }}" ] || { echo "::error::Expected ${{ matrix.lipo_arch }}, got $archs"; exit 1; }
+
+          codesign -dv --verbose=4 "$app" 2>&1 | tee "$RUNNER_TEMP/codesign.txt"
+          grep -F "Authority=$SIGNING_IDENTITY" "$RUNNER_TEMP/codesign.txt" > /dev/null \
+            || { echo "::error::$app is not signed with '$SIGNING_IDENTITY'"; exit 1; }
+          codesign --verify --deep --strict --verbose=2 "$app"
+
+          # Whether the hardened runtime is on decides if the entitlements matter.
+          codesign -d --entitlements - "$app" || true
+
+          ls "$bundle"/dmg/*.dmg
+          ls "$bundle"/macos/*.app.tar.gz "$bundle"/macos/*.app.tar.gz.sig
+
+      - name: Remove signing keychain
+        if: always()
+        run: security delete-keychain "$RUNNER_TEMP/murmullo-signing.keychain-db" || true
+
+  publish:
+    name: Publish release and update manifest
+    needs: [draft-release, build]
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/')
-    
+    # One manifest, so two releases must not rewrite it at the same time.
+    concurrency:
+      group: updater-manifest
+      cancel-in-progress: false
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_REPO: ${{ github.repository }}
+      RELEASE_ID: ${{ needs.draft-release.outputs.release_id }}
+      PRERELEASE: ${{ needs.draft-release.outputs.prerelease }}
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - name: Generate latest.json
+        run: |
+          assets=$(gh api "repos/$GH_REPO/releases/$RELEASE_ID/assets" --paginate)
 
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: artifacts/
+          # Prints "<signature>\t<url>" for the updater archive whose name ends in $1.
+          platform_entry() {
+            local suffix=$1 name id
+            name=$(jq -r --arg s "$suffix" '[.[] | select(.name | endswith($s))] | if length == 1 then .[0].name else empty end' <<< "$assets")
+            [ -n "$name" ] || { echo "::error::Expected exactly one asset ending in $suffix" >&2; return 1; }
+            id=$(jq -r --arg n "$name.sig" '.[] | select(.name == $n) | .id' <<< "$assets")
+            [ -n "$id" ] || { echo "::error::Missing signature $name.sig" >&2; return 1; }
+            signature=$(gh api -H "Accept: application/octet-stream" "repos/$GH_REPO/releases/assets/$id")
+            printf '%s\thttps://github.com/%s/releases/download/%s/%s\n' "$signature" "$GH_REPO" "$TAG" "$name"
+          }
 
-      - name: Create Release
-        uses: softprops/action-gh-release@v1
-        with:
-          tag_name: ${{ github.ref_name }}
-          name: Murmullo ${{ github.ref_name }}
-          body: |
-            ## What's New in ${{ github.ref_name }}
-            
-            See [CHANGELOG.md](CHANGELOG.md) for detailed changes.
-            
-            ## Downloads
-            
-            ### macOS
-            - **Intel Macs**: `murmullo-macos-x64.dmg`
-            - **Apple Silicon**: `murmullo-macos-aarch64.dmg`
-            
-            ### Windows
-            - **x64**: `murmullo-windows-x64.msi`
-            
-            ### Linux
-            - **x64**: `murmullo-linux-x64.AppImage`
-            
-            ## Installation
-            
-            1. Download the appropriate file for your platform
-            2. Run the installer
-            3. Grant necessary permissions when prompted
-            4. Launch Murmullo and start dictating!
-            
-            ## System Requirements
-            
-            - **macOS**: 12.0 or later
-            - **Windows**: Windows 10 or later
-            - **Linux**: Ubuntu 18.04+ or equivalent
-            
-          files: |
-            artifacts/murmullo-macos-x64/src-tauri/target/release/bundle/dmg/*.dmg
-            artifacts/murmullo-macos-aarch64/src-tauri/target/release/bundle/dmg/*.dmg
-            artifacts/murmullo-windows-x64/src-tauri/target/release/bundle/msi/*.msi
-            artifacts/murmullo-linux-x64/src-tauri/target/release/bundle/appimage/*.AppImage
-          draft: false
-          prerelease: false
+          IFS=$'\t' read -r arm_sig arm_url < <(platform_entry _aarch64.app.tar.gz)
+          IFS=$'\t' read -r x64_sig x64_url < <(platform_entry _x64.app.tar.gz)
+
+          jq -n \
+            --arg version "${TAG#v}" \
+            --arg notes "Murmullo $TAG" \
+            --arg date "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --arg arm_sig "$arm_sig" --arg arm_url "$arm_url" \
+            --arg x64_sig "$x64_sig" --arg x64_url "$x64_url" \
+            '{
+              version: $version,
+              notes: $notes,
+              pub_date: $date,
+              platforms: {
+                "darwin-aarch64": { signature: $arm_sig, url: $arm_url },
+                "darwin-x86_64": { signature: $x64_sig, url: $x64_url }
+              }
+            }' > latest.json
+          cat latest.json
+
+      - name: Publish the release
+        run: |
+          gh api "repos/$GH_REPO/releases/$RELEASE_ID/assets" --paginate --jq '.[] | select(.name == "latest.json") | .id' \
+            | while read -r id; do gh api -X DELETE "repos/$GH_REPO/releases/assets/$id"; done
+          curl -sSf -X POST -H "Authorization: Bearer $GH_TOKEN" -H "Content-Type: application/json" \
+            --data-binary @latest.json \
+            "https://uploads.github.com/repos/$GH_REPO/releases/$RELEASE_ID/assets?name=latest.json" > /dev/null
+
+          gh api -X PATCH "repos/$GH_REPO/releases/$RELEASE_ID" \
+            -F draft=false -F prerelease="$PRERELEASE" --silent
+
+      - name: Update the updater-manifest release
+        run: |
+          # Permanent release hosting the endpoint https://github.com/<repo>/releases/download/updater-manifest/latest.json.
+          # Pre-release and not "latest" so it never takes over /releases/latest.
+          manifest_id=$(gh api "repos/$GH_REPO/releases" --paginate \
+            --jq '.[] | select(.tag_name == "updater-manifest") | .id' | head -n1)
+          if [ -z "$manifest_id" ]; then
+            gh release create updater-manifest --target "$GITHUB_SHA" --prerelease --latest=false \
+              --title "Updater manifest" \
+              --notes "Permanent release that hosts latest.json for the in-app updater. Do not delete."
+            manifest_id=$(gh api "repos/$GH_REPO/releases" --paginate \
+              --jq '.[] | select(.tag_name == "updater-manifest") | .id' | head -n1)
+          fi
+
+          gh api "repos/$GH_REPO/releases/$manifest_id/assets" --paginate --jq '.[] | select(.name == "latest.json") | .id' \
+            | while read -r id; do gh api -X DELETE "repos/$GH_REPO/releases/assets/$id"; done
+          curl -sSf -X POST -H "Authorization: Bearer $GH_TOKEN" -H "Content-Type: application/json" \
+            --data-binary @latest.json \
+            "https://uploads.github.com/repos/$GH_REPO/releases/$manifest_id/assets?name=latest.json" > /dev/null
