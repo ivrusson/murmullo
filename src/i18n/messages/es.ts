@@ -368,6 +368,18 @@ export const es = {
     doneTitle: 'Actualizado a v{version}',
     doneBody: 'Murmullo se ha reiniciado con la nueva versión.',
     doneToast: 'Murmullo se actualizó a v{version}',
+    binary: {
+      available: 'Actualización disponible',
+      downloading: 'Descargando actualización… {percent}%',
+      downloadingUnknown: 'Descargando actualización…',
+      busy: 'Termina el dictado para actualizar',
+      dialogTitle: 'Murmullo v{version} está lista',
+      dialogBody:
+        'La actualización ya está descargada y verificada. Murmullo se cerrará y volverá a abrirse con la nueva versión. Si prefieres esperar, se instalará cuando salgas de la app.',
+      install: 'Instalar y reiniciar',
+      later: 'Más tarde',
+      installing: 'Instalando…',
+    },
     groups: {
       Added: 'Novedades',
       Changed: 'Cambios',
@@ -520,6 +532,13 @@ export const es = {
         'Hay cambios locales en la carpeta de Murmullo. Guárdalos o descártalos antes de actualizar.',
       already_running: 'Ya hay una actualización en curso.',
       spawn_failed: 'No se pudo arrancar el actualizador.',
+      not_binary_install:
+        'Esta copia de Murmullo se instaló desde el repositorio; se actualiza con ./update.sh.',
+      download_failed:
+        'No se pudo descargar o verificar la actualización. Se ha descartado.',
+      install_failed: 'No se pudo instalar la actualización.',
+      nothing_to_install: 'No hay ninguna actualización descargada.',
+      dictation_running: 'Termina el dictado para actualizar.',
     },
     generic:
       'No se pudo completar la acción. Revisa Runtimes o inténtalo de nuevo.',

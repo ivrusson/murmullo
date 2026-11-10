@@ -1,9 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  binaryButton,
   deriveView,
   overallPercent,
   stepStates,
+  type BinaryUpdateState,
   type UpdateStatus,
 } from './progress.ts';
 
@@ -76,4 +78,46 @@ test('percent is clamped and null stays null', () => {
   assert.equal(overallPercent(status({ percent: 140 })), 100);
   assert.equal(overallPercent(status({ percent: -3 })), 0);
   assert.equal(overallPercent(status({ percent: null })), null);
+});
+
+const binary = (patch: Partial<BinaryUpdateState>): BinaryUpdateState => ({
+  phase: 'idle',
+  version: '0.11.0',
+  downloaded: 0,
+  total: null,
+  error: null,
+  busy: false,
+  ...patch,
+});
+
+test('the binary update button stays hidden without an update', () => {
+  assert.deepEqual(binaryButton(null), { kind: 'hidden' });
+  assert.deepEqual(binaryButton(binary({})), { kind: 'hidden' });
+  assert.deepEqual(binaryButton(binary({ phase: 'error' })), {
+    kind: 'hidden',
+  });
+});
+
+test('the binary update button shows progress once the size is known', () => {
+  assert.deepEqual(
+    binaryButton(binary({ phase: 'downloading', downloaded: 10 })),
+    { kind: 'downloading', percent: null }
+  );
+  assert.deepEqual(
+    binaryButton(binary({ phase: 'downloading', downloaded: 30, total: 120 })),
+    { kind: 'downloading', percent: 25 }
+  );
+});
+
+test('installing is blocked while dictating', () => {
+  assert.deepEqual(binaryButton(binary({ phase: 'ready' })), {
+    kind: 'ready',
+    version: '0.11.0',
+    blocked: false,
+  });
+  assert.deepEqual(binaryButton(binary({ phase: 'ready', busy: true })), {
+    kind: 'ready',
+    version: '0.11.0',
+    blocked: true,
+  });
 });
