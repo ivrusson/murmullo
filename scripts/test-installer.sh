@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # End-to-end check of install.sh / update.sh against a throwaway local origin.
 # No network, no real pnpm/cargo: the toolchain is stubbed (MURMULLO_KEEP_PATH=1).
+# The binary install (default mode) runs against stubbed curl/hdiutil/ditto.
 #
 #   bash scripts/test-installer.sh
 set -euo pipefail
@@ -92,17 +93,17 @@ check "reports installed and latest versions" bash -c "echo '$OUT' | grep -q 'La
 echo "manual clone stays on main -> gets pinned"
 git clone -q "$ORIGIN" "$TMP/manual"
 check "starts on main, after the release" test "$(head_tag "$TMP/manual")" = none
-run_install "$TMP/manual" --yes --no-launch >/dev/null
+run_install "$TMP/manual" --from-source --yes --no-launch >/dev/null
 check "ends on v0.2.0" test "$(head_tag "$TMP/manual")" = v0.2.0
 
 echo "leaves development checkouts alone"
 git clone -q "$ORIGIN" "$TMP/dev"
 git -C "$TMP/dev" switch -q -c feat/mine
-run_install "$TMP/dev" --yes --no-launch >/dev/null
+run_install "$TMP/dev" --from-source --yes --no-launch >/dev/null
 check "feature branch untouched" test "$(git -C "$TMP/dev" branch --show-current)" = feat/mine
 git -C "$TMP/dev" switch -q main
 echo dirty >>"$TMP/dev/package.json"
-run_install "$TMP/dev" --yes --no-launch >/dev/null
+run_install "$TMP/dev" --from-source --yes --no-launch >/dev/null
 check "dirty tree untouched" test "$(git -C "$TMP/dev" branch --show-current)" = main
 git -C "$TMP/dev" checkout -q -- package.json
 run_install "$TMP/dev" --yes --no-launch --no-pin >/dev/null
@@ -112,7 +113,7 @@ check "--ref v0.1.0 checks out that tag" test "$(head_tag "$TMP/dev")" = v0.1.0
 
 echo "dry run changes nothing"
 git -C "$TMP/dev" checkout -q main
-OUT=$(run_install "$TMP/dev" --dry-run)
+OUT=$(run_install "$TMP/dev" --from-source --dry-run)
 check "dry run stays on main" test "$(git -C "$TMP/dev" branch --show-current)" = main
 
 echo "update flow"
@@ -185,6 +186,110 @@ fi
 check "status names the target release" grep -q '"target":"v0.2.0"' "$STATUS"
 check "status carries the updater pid" grep -Eq '"pid":[0-9]+' "$STATUS"
 check "app updated through the status flow" test "$(head_tag "$TMP/app")" = v0.2.0
+
+echo "binary install (default mode)"
+# A fake Mac: uname, the GitHub API (curl), the .dmg (hdiutil) and the copy tools.
+MAC="$TMP/macbin"
+API="https://api.test/repos/ivrusson/murmullo"
+DL="https://github.com/ivrusson/murmullo/releases/download"
+mkdir -p "$MAC" "$TMP/apps"
+cat >"$TMP/releases.json" <<JSON
+[
+  {"tag_name": "updater-manifest", "assets": [
+    {"browser_download_url": "$DL/updater-manifest/latest.json"}]},
+  {"tag_name": "v0.11.0-beta.1", "prerelease": true, "assets": [
+    {"browser_download_url": "$DL/v0.11.0-beta.1/Murmullo_0.11.0-beta.1_aarch64.dmg"},
+    {"browser_download_url": "$DL/v0.11.0-beta.1/Murmullo_0.11.0-beta.1_x64.dmg"},
+    {"browser_download_url": "$DL/v0.11.0-beta.1/Murmullo_aarch64.app.tar.gz"}]},
+  {"tag_name": "v0.10.0", "prerelease": false, "assets": []}
+]
+JSON
+cat >"$TMP/latest.json" <<JSON
+{"tag_name": "v0.10.1", "prerelease": false, "assets": [
+  {"browser_download_url": "$DL/v0.10.1/Murmullo_0.10.1_aarch64.dmg"}]}
+JSON
+cat >"$MAC/uname" <<STUB
+#!/bin/sh
+case "\$1" in -m) echo "\${FAKE_ARCH:-arm64}" ;; *) echo Darwin ;; esac
+STUB
+cat >"$MAC/curl" <<STUB
+#!/bin/sh
+echo "curl \$*" >> "$TMP/calls.log"
+out=""
+for a in "\$@"; do
+  [ "\$prev" = "-o" ] && out="\$a"
+  prev="\$a"
+  url="\$a"
+done
+if [ -n "\$out" ]; then echo dmg > "\$out"; exit 0; fi
+case "\$url" in
+  */missing/*) exit 22 ;;
+  */releases/latest) cat "$TMP/latest.json" ;;
+  */releases*) cat "$TMP/releases.json" ;;
+  *) exit 22 ;;
+esac
+STUB
+cat >"$MAC/hdiutil" <<STUB
+#!/bin/sh
+echo "hdiutil \$*" >> "$TMP/calls.log"
+if [ "\$1" = attach ]; then
+  while [ \$# -gt 0 ]; do [ "\$1" = -mountpoint ] && mnt="\$2"; shift; done
+  mkdir -p "\$mnt/Murmullo.app/Contents" && echo app > "\$mnt/Murmullo.app/Contents/Info.plist"
+fi
+exit 0
+STUB
+cat >"$MAC/ditto" <<STUB
+#!/bin/sh
+echo "ditto \$*" >> "$TMP/calls.log"
+cp -R "\$1" "\$2"
+STUB
+for tool in xattr open osascript sudo; do
+  printf '#!/bin/sh\necho "%s $*" >> "%s/calls.log"\nexit 0\n' "$tool" "$TMP" >"$MAC/$tool"
+done
+chmod +x "$MAC"/*
+run_bin() { (cd "$TMP/standalone" && PATH="$MAC:$PATH" MURMULLO_API_URL="$API" \
+  MURMULLO_APPS_DIR="$TMP/apps" bash ./install.sh "$@" 2>&1); }
+
+: >"$TMP/calls.log"
+OUT=$(run_bin --yes)
+check "asks the API for every release, pre-releases included" grep -q "curl .*$API/releases?" "$TMP/calls.log"
+check "downloads the arm64 .dmg of the newest release" \
+  grep -q "curl .*Murmullo_0.11.0-beta.1_aarch64.dmg" "$TMP/calls.log"
+check "copies Murmullo.app into the apps folder" test -f "$TMP/apps/Murmullo.app/Contents/Info.plist"
+check "clears the quarantine flag" grep -q "^xattr -dr com.apple.quarantine $TMP/apps/Murmullo.app" "$TMP/calls.log"
+check "unmounts the .dmg" grep -q '^hdiutil detach' "$TMP/calls.log"
+check "opens the app" grep -q "^open $TMP/apps/Murmullo.app" "$TMP/calls.log"
+check "no sudo for a writable folder" bash -c "! grep -q '^sudo' '$TMP/calls.log'"
+check "does not touch the source toolchain" bash -c "! grep -q '^pnpm' '$TMP/calls.log'"
+
+: >"$TMP/calls.log"
+FAKE_ARCH=x86_64 run_bin --yes --no-launch >/dev/null
+check "Intel Macs get the _x64.dmg" grep -q "curl .*Murmullo_0.11.0-beta.1_x64.dmg" "$TMP/calls.log"
+check "--no-launch does not open the app" bash -c "! grep -q '^open' '$TMP/calls.log'"
+
+: >"$TMP/calls.log"
+run_bin --yes --stable --no-launch >/dev/null
+check "--stable uses /releases/latest" grep -q "curl .*$API/releases/latest" "$TMP/calls.log"
+check "--stable installs the stable .dmg" grep -q "curl .*Murmullo_0.10.1_aarch64.dmg" "$TMP/calls.log"
+
+: >"$TMP/calls.log"
+OUT=$(run_bin --dry-run)
+check "dry run names the release" bash -c "echo '$OUT' | grep -q 'v0.11.0-beta.1'"
+check "dry run downloads nothing" bash -c "! grep -q -- '-o ' '$TMP/calls.log'"
+
+: >"$TMP/calls.log"
+chmod 555 "$TMP/apps"
+run_bin --yes --no-launch >/dev/null
+chmod 755 "$TMP/apps"
+check "a protected apps folder goes through sudo" grep -q '^sudo ditto' "$TMP/calls.log"
+
+: >"$TMP/calls.log"
+set +e
+(cd "$TMP/standalone" && PATH="$MAC:$PATH" MURMULLO_API_URL="$API/missing" \
+  MURMULLO_APPS_DIR="$TMP/apps" bash ./install.sh --yes >/dev/null 2>&1)
+CODE=$?
+set -e
+check "no release with a .dmg fails cleanly" test "$CODE" -ne 0
 
 if [ "$FAILED" -ne 0 ]; then
   echo "FAILED"

@@ -2,15 +2,21 @@
 # Murmullo guided installer (macOS / Linux).
 # Bash 3.2 compatible (macOS /usr/bin/bash).
 #
+#   curl -fsSL https://raw.githubusercontent.com/ivrusson/murmullo/main/install.sh | bash
+#
+# By default (macOS) it downloads the latest release .dmg for this Mac, copies
+# Murmullo.app to /Applications, clears the quarantine flag and opens it.
+#
+# --from-source keeps the developer flow: clone, toolchain, `pnpm tauri dev`.
 #   git clone https://github.com/ivrusson/murmullo.git
 #   cd murmullo
-#   ./install.sh
+#   ./install.sh --from-source
 #
-# After the toolchain check it sets the checkout to the latest stable release tag
+# In source mode, after the toolchain check it sets the checkout to the latest stable release tag
 # (vX.Y.Z on origin). `./update.sh` (= install.sh --update) does the same later:
 # look up the newest release, ask, check it out, reinstall and relaunch.
 #
-# Flags: --yes  --dev  --build  --dry-run  --lang es|en  --ref REF  --no-pin
+# Flags: --from-source  --stable  --yes  --dev  --build  --dry-run  --lang es|en  --ref REF  --no-pin
 #        --update  --check  --no-launch  --status-file PATH  --help
 
 set -euo pipefail
@@ -21,6 +27,8 @@ if [ -z "${BASH_VERSION:-}" ]; then
 fi
 
 REPO_URL="${MURMULLO_REPO_URL:-https://github.com/ivrusson/murmullo.git}"
+API_URL="${MURMULLO_API_URL:-https://api.github.com/repos/ivrusson/murmullo}"
+APPS_DIR="${MURMULLO_APPS_DIR:-/Applications}"
 CLONE_DIR="${MURMULLO_DIR:-$HOME/murmullo}"
 MIN_NODE_MAJOR=18
 MIN_MACOS_MAJOR=12
@@ -34,6 +42,8 @@ NO_PIN=0
 NO_LAUNCH=0
 DO_UPDATE=0
 CHECK_ONLY=0
+FROM_SOURCE=0
+STABLE_ONLY=0
 REF=""
 STATUS_FILE=""
 LAST_ERR=""
@@ -65,6 +75,8 @@ Usage:
   ./install.sh [options]
 
 Options:
+  --from-source      Clone the repo and run it with the dev toolchain (for developers)
+  --stable           Binary install: skip pre-releases
   --yes, -y          Non-interactive (install missing tools without asking)
   --dev              Start `pnpm tauri dev` after setup
   --build            Compile a release build (`pnpm tauri build`)
@@ -79,7 +91,11 @@ Options:
   --status-file PATH Write progress as JSON to PATH (the app reads it to show the update)
   --help, -h         Show this help
 
-By default the checkout is set to the latest stable release tag (vX.Y.Z on origin).
+By default (macOS) the latest release .dmg is installed into /Applications.
+--dev, --build, --dir, --ref, --no-pin, --update, --check and --status-file
+only apply to source mode and imply --from-source.
+
+In source mode the checkout is set to the latest stable release tag (vX.Y.Z on origin).
 It is left alone on a feature branch, or when tracked files have local changes.
 
 macOS 12+ is the supported dictation platform. Windows/Linux can compile, but
@@ -209,6 +225,30 @@ t() {
     compile_notice.es) echo "Compilando la nueva versión. La primera apertura tras actualizar puede tardar unos minutos; Murmullo se abrirá solo." ;;
     stopping.en) echo "Stopping Murmullo…" ;;
     stopping.es) echo "Parando Murmullo…" ;;
+    bin_start.en) echo "This assistant downloads the latest Murmullo release and installs it in ${APPS_DIR}." ;;
+    bin_start.es) echo "Este asistente descarga la última versión de Murmullo y la instala en ${APPS_DIR}." ;;
+    bin_macos_only.en) echo "The ready-made app is macOS only. On this system use ./install.sh --from-source." ;;
+    bin_macos_only.es) echo "La app lista para usar es solo para macOS. En este sistema usa ./install.sh --from-source." ;;
+    bin_arch.en) echo "Unsupported processor:" ;;
+    bin_arch.es) echo "Procesador no soportado:" ;;
+    bin_lookup.en) echo "Looking up the latest release…" ;;
+    bin_lookup.es) echo "Buscando la última versión…" ;;
+    bin_none.en) echo "No release with a .dmg for this Mac was found. Try ./install.sh --from-source." ;;
+    bin_none.es) echo "No hay ninguna versión con .dmg para este Mac. Prueba ./install.sh --from-source." ;;
+    bin_download_failed.en) echo "Could not download the release. Nothing was changed." ;;
+    bin_download_failed.es) echo "No se pudo descargar la versión. No se ha cambiado nada." ;;
+    bin_mount_failed.en) echo "Could not open the downloaded .dmg." ;;
+    bin_mount_failed.es) echo "No se pudo abrir el .dmg descargado." ;;
+    bin_no_app.en) echo "The .dmg does not contain Murmullo.app." ;;
+    bin_no_app.es) echo "El .dmg no contiene Murmullo.app." ;;
+    bin_install_q.en) echo "Install %s in %s?" ;;
+    bin_install_q.es) echo "¿Instalar %s en %s?" ;;
+    bin_sudo.en) echo "%s needs administrator rights; macOS will ask for your password." ;;
+    bin_sudo.es) echo "%s necesita permisos de administrador; macOS te pedirá la contraseña." ;;
+    bin_installed.en) echo "Installed" ;;
+    bin_installed.es) echo "Instalada" ;;
+    bin_opening.en) echo "Opening Murmullo…" ;;
+    bin_opening.es) echo "Abriendo Murmullo…" ;;
     *) echo "$1" ;;
   esac
 }
@@ -889,28 +929,144 @@ print_tool_status() {
   fi
 }
 
+# --- Binary install (default on macOS) -------------------------------------
+
+# Suffix of the tauri-action .dmg for this Mac: _aarch64.dmg or _x64.dmg.
+dmg_suffix() {
+  case "$(uname -m)" in
+    arm64|aarch64) echo _aarch64.dmg ;;
+    x86_64) echo _x64.dmg ;;
+    *) return 1 ;;
+  esac
+}
+
+# Download URL of the newest release asset ending in $1. The releases list is
+# newest first and includes pre-releases; --stable asks for /releases/latest,
+# which GitHub limits to stable releases. Releases without that asset are skipped.
+release_asset_url() {
+  if [ "$STABLE_ONLY" -eq 1 ]; then
+    _api="$API_URL/releases/latest"
+  else
+    _api="$API_URL/releases?per_page=30"
+  fi
+  curl -fsSL -H 'Accept: application/vnd.github+json' "$_api" 2>/dev/null \
+    | sed -n 's/.*"browser_download_url": *"\([^"]*\)".*/\1/p' \
+    | grep -F -- "$1" \
+    | grep -v '/download/updater-manifest/' \
+    | head -1
+}
+
+# Copy as the user when possible; only fall back to sudo for a protected folder.
+as_owner() {
+  if [ -w "$APPS_DIR" ] && { [ ! -e "$_dest" ] || [ -w "$_dest" ]; }; then
+    "$@"
+  else
+    sudo "$@"
+  fi
+}
+
+install_binary() {
+  if [ "$(os_family)" != macos ]; then
+    err "$(t bin_macos_only)"
+    exit 1
+  fi
+  if ! _suffix=$(dmg_suffix); then
+    err "$(t bin_arch) $(uname -m)"
+    exit 1
+  fi
+  step "$(t bin_lookup)"
+  _url=$(release_asset_url "$_suffix" || true)
+  if [ -z "$_url" ]; then
+    err "$(t bin_none)"
+    exit 1
+  fi
+  _tag=$(printf '%s' "$_url" | sed -n 's|.*/releases/download/\([^/]*\)/.*|\1|p')
+  _dest="$APPS_DIR/Murmullo.app"
+  ok "$(t ver_latest) ${_tag:-?} (${_url##*/})"
+  if [ "$DRY_RUN" -eq 1 ]; then
+    info "dry-run: $_url → $_dest"
+    warn "$(t dry)"
+    exit 0
+  fi
+  # shellcheck disable=SC2059
+  if ! ask_yes "$(printf "$(t bin_install_q)" "Murmullo ${_tag}" "$APPS_DIR")" 1; then
+    info "$(t abort)"
+    exit 0
+  fi
+
+  _work=$(mktemp -d "${TMPDIR:-/tmp}/murmullo-install.XXXXXX")
+  _mnt="$_work/mnt"
+  _dmg="$_work/${_url##*/}"
+  # shellcheck disable=SC2064
+  trap "hdiutil detach -quiet '$_mnt' >/dev/null 2>&1 || true; rm -rf '$_work'" EXIT
+  step "$(t downloading)"
+  if ! curl -fL --progress-bar -o "$_dmg" "$_url"; then
+    err "$(t bin_download_failed)"
+    exit 1
+  fi
+  mkdir -p "$_mnt"
+  if ! hdiutil attach -nobrowse -readonly -quiet -mountpoint "$_mnt" "$_dmg"; then
+    err "$(t bin_mount_failed)"
+    exit 1
+  fi
+  _app=""
+  for _cand in "$_mnt"/*.app; do
+    [ -d "$_cand" ] && _app="$_cand" && break
+  done
+  if [ -z "$_app" ]; then
+    err "$(t bin_no_app)"
+    exit 1
+  fi
+
+  if [ ! -w "$APPS_DIR" ] || { [ -e "$_dest" ] && [ ! -w "$_dest" ]; }; then
+    # shellcheck disable=SC2059
+    info "$(printf "$(t bin_sudo)" "$APPS_DIR")"
+  fi
+  # A running copy keeps the old binary mapped; quit it before replacing it.
+  osascript -e 'tell application id "com.murmullo.app" to quit' >/dev/null 2>&1 || true
+  as_owner rm -rf "$_dest"
+  as_owner ditto "$_app" "$_dest"
+  hdiutil detach -quiet "$_mnt" >/dev/null 2>&1 || true
+  # Self-signed build: without this Gatekeeper refuses to open it.
+  as_owner xattr -dr com.apple.quarantine "$_dest" 2>/dev/null || true
+  ok "$(t bin_installed) Murmullo ${_tag} → $_dest"
+
+  step "$(t next)"
+  log "  1. $(t next_1)"
+  log "  2. $(t next_2)"
+  log "  3. $(t next_3)"
+  if [ "$NO_LAUNCH" -eq 0 ]; then
+    info "$(t bin_opening)"
+    open "$_dest" || true
+  fi
+}
+
 parse_args() {
   detect_lang
   while [ $# -gt 0 ]; do
     case "$1" in
+      --from-source) FROM_SOURCE=1 ;;
+      --stable) STABLE_ONLY=1 ;;
       --yes|-y) ASSUME_YES=1 ;;
-      --dev) DO_DEV=1 ;;
-      --build) DO_BUILD=1 ;;
+      --dev) DO_DEV=1; FROM_SOURCE=1 ;;
+      --build) DO_BUILD=1; FROM_SOURCE=1 ;;
       --no-launch) NO_LAUNCH=1 ;;
       --status-file)
         shift
         STATUS_FILE="${1:-}"
+        FROM_SOURCE=1
         if [ -z "$STATUS_FILE" ]; then
           err "--status-file needs a path"
           exit 1
         fi
         ;;
-      --no-pin) NO_PIN=1 ;;
-      --update) DO_UPDATE=1 ;;
-      --check) DO_UPDATE=1; CHECK_ONLY=1 ;;
+      --no-pin) NO_PIN=1; FROM_SOURCE=1 ;;
+      --update) DO_UPDATE=1; FROM_SOURCE=1 ;;
+      --check) DO_UPDATE=1; CHECK_ONLY=1; FROM_SOURCE=1 ;;
       --ref)
         shift
         REF="${1:-}"
+        FROM_SOURCE=1
         if [ -z "$REF" ]; then
           err "--ref needs a tag or branch"
           exit 1
@@ -927,6 +1083,7 @@ parse_args() {
       --dir)
         shift
         CLONE_DIR="${1:-}"
+        FROM_SOURCE=1
         if [ -z "$CLONE_DIR" ]; then
           err "--dir needs a path"
           exit 1
@@ -953,6 +1110,17 @@ main() {
   if [ "${MURMULLO_PINNED:-0}" != 1 ]; then
     printf '\n%s%s%s\n' "$BOLD" "$(t banner)" "$RESET"
     printf '%s%s%s\n\n' "$DIM" "$(t tagline)" "$RESET"
+  fi
+  # A re-exec from pin_release / run_update is always source mode.
+  if [ "${MURMULLO_PINNED:-0}" = 1 ]; then
+    FROM_SOURCE=1
+  fi
+  if [ "$FROM_SOURCE" -eq 0 ]; then
+    info "$(t bin_start)"
+    install_binary
+    exit 0
+  fi
+  if [ "${MURMULLO_PINNED:-0}" != 1 ]; then
     info "$(t start)"
   fi
   ensure_dir_ok
