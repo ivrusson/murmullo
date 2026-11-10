@@ -13,8 +13,9 @@ LLM) and your dictionary, then pastes into the app you were already using.
 **Supported today:** macOS 12+. Pasting into the focused app on Windows and Linux is not implemented
 yet.
 
-Signed disk images and store packages come later. Until then, clone this repository and run the
-[guided installer](#install-from-the-repository).
+Download the `.dmg` from [Releases](https://github.com/ivrusson/murmullo/releases) or let the
+[installer](#install-on-macos) fetch it. Developers can still run it
+[from the repository](#install-from-the-repository).
 
 ## What to do with it
 
@@ -52,12 +53,56 @@ still there if you want a different local model. If neither is ready, dictation 
 dictionary. Learning does not live in the speech model. Parakeet is not fine-tuned; the dictionary
 and prompt are the layer that corrects itself.
 
+## Install on macOS
+
+Releases ship two disk images: `Murmullo_<version>_aarch64.dmg` (Apple Silicon) and
+`Murmullo_<version>_x64.dmg` (Intel). Betas are marked as pre-releases on GitHub.
+
+### With the installer (recommended)
+
+```bash
+curl -fsSLO https://raw.githubusercontent.com/ivrusson/murmullo/main/install.sh
+bash install.sh
+```
+
+It picks the image for your Mac, copies `Murmullo.app` to `/Applications` (asking for your password
+only if needed), removes the quarantine flag and opens the app. `--from-source` keeps the old
+developer path instead: clone, toolchain, `pnpm tauri dev` (see
+[Install from the repository](#install-from-the-repository)).
+
+### By hand from the .dmg
+
+1. Open the `.dmg` and drag Murmullo to Applications.
+2. Open Murmullo once. macOS says it cannot verify the developer; close the dialog.
+3. Go to **System Settings → Privacy & Security**, scroll down and click **Open Anyway** next to
+   Murmullo. Confirm with your password.
+
+On macOS 15 and later, right-click → Open no longer skips this check, so step 3 is the way.
+
+Or clear the quarantine flag from Terminal:
+
+```bash
+xattr -dr com.apple.quarantine /Applications/Murmullo.app
+```
+
+### Why the warning
+
+Murmullo is signed with its own stable certificate, not with a paid Apple Developer ID, so it is not
+notarized and Gatekeeper asks once. Because every release is signed with the same identity, macOS
+keeps your Microphone, Accessibility and Input Monitoring permissions across updates. Updates are
+downloaded inside the app and verified with a minisign signature; they do not carry the quarantine
+flag, so you only see the warning on the first install.
+
+Homebrew: coming soon.
+
 ## Install from the repository
+
+For development. `./install.sh --from-source` from a clone does the same.
 
 ```bash
 git clone https://github.com/ivrusson/murmullo.git
 cd murmullo
-./install.sh          # macOS / Linux — or double-click install.command on a Mac
+./install.sh --from-source   # macOS / Linux — or double-click install.command on a Mac
 ```
 
 ```powershell
@@ -121,8 +166,7 @@ together: [docs/USAGE.md](docs/USAGE.md).
 
 Murmullo is **beta** (`0.x`). The next product work is packaging, then the rest of the desktop:
 
-- **Native installers** — signed `.dmg` / `.app` on macOS, then Windows and Linux packages, so
-  cloning the repo is no longer the default path
+- **Native installers** — Windows and Linux packages, and a Homebrew cask for the macOS `.dmg`
 - **`nemo-speech` as a Tauri `externalBin`** — fewer moving pieces on first run
 - **Paste on Windows and Linux** — same hold-to-talk promise as on the Mac
 - **More local correctors** — the built-in Qwen model is the default on-device path; other local
