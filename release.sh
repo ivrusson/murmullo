@@ -209,7 +209,8 @@ main() {
     else
         create_release $release_type
         print_success "Release $release_type completed! 🎉"
-        print_status "The GitHub Actions pipeline will now build and publish the release artifacts."
+        print_status "The pushed v* tag starts the Release Pipeline on GitHub Actions: it builds the signed macOS .dmg files and publishes the release when both architectures succeed."
+        print_status "To retry a failed run, start the workflow from the Actions tab with the same tag."
     fi
 }
 
