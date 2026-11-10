@@ -1,4 +1,5 @@
 mod audio;
+mod binary_update;
 mod codes;
 mod commands;
 mod config;
@@ -131,6 +132,7 @@ pub fn run() {
         .plugin(tauri_plugin_macos_permissions::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
                 .with_handler(|app, _shortcut, event| match event.state {
@@ -145,6 +147,7 @@ pub fn run() {
         )
         .register_uri_scheme_protocol("crash", crate::crash::serve_crash_html)
         .manage(app_state)
+        .manage(binary_update::BinaryUpdater::default())
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                 if window.label() == "main" {
@@ -177,6 +180,7 @@ pub fn run() {
 
             crate::crash::show_if_pending(app.handle());
             crate::updater::announce_if_just_updated();
+            crate::binary_update::init(app.handle());
 
             let runtime_boot = runtime.clone();
             let models_boot = model_manager.clone();
@@ -256,6 +260,9 @@ pub fn run() {
             updater::get_update_status,
             updater::clear_update_status,
             updater::get_update_log,
+            binary_update::get_binary_update,
+            binary_update::check_binary_update,
+            binary_update::install_binary_update,
             get_runtime_status,
             get_pipeline_logs,
             get_pipeline_log_path,
@@ -292,8 +299,13 @@ pub fn run() {
             crate::crash::close_crash_reporter_window,
             crate::crash::report_frontend_crash,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|app, event| {
+            if let tauri::RunEvent::Exit = event {
+                crate::binary_update::install_on_exit(app);
+            }
+        });
 }
 
 fn create_main_window(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
@@ -324,6 +336,7 @@ fn setup_tray(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     let show = MenuItemBuilder::with_id("show", "Abrir Murmullo").build(app)?;
     let quit = MenuItemBuilder::with_id("quit", "Salir").build(app)?;
     let menu = MenuBuilder::new(app).items(&[&show, &quit]).build()?;
+    crate::binary_update::attach_tray(app.handle(), &menu)?;
 
     #[cfg(target_os = "macos")]
     let icon = Image::from_bytes(include_bytes!("../icons/tray-template-runtime.png"))?;
@@ -343,6 +356,7 @@ fn setup_tray(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
                 }
             }
             "quit" => app.exit(0),
+            crate::binary_update::TRAY_ITEM_ID => crate::binary_update::on_tray_click(app),
             _ => {}
         })
         .build(app)?;

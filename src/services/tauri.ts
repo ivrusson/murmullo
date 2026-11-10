@@ -13,7 +13,11 @@ import type {
   MacosPermissionStatus,
   LlmProviderInfo,
 } from '../types';
-import type { UpdateInfo, UpdateStatus } from '../updates/progress';
+import type {
+  BinaryUpdateState,
+  UpdateInfo,
+  UpdateStatus,
+} from '../updates/progress';
 
 export const audioService = {
   async listDevices(): Promise<AudioDevice[]> {
@@ -256,5 +260,18 @@ export const updateService = {
   },
   async log(): Promise<string> {
     return await invoke('get_update_log');
+  },
+};
+
+export const binaryUpdateService = {
+  /** Null for source installs, which update through `updateService`. */
+  async state(): Promise<BinaryUpdateState | null> {
+    return await invoke('get_binary_update');
+  },
+  async check(): Promise<BinaryUpdateState> {
+    return await invoke('check_binary_update');
+  },
+  async install(): Promise<void> {
+    return await invoke('install_binary_update');
   },
 };

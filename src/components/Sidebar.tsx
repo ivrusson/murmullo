@@ -9,6 +9,7 @@ import { MurmulloView } from '@/mascot/MurmulloView';
 import { useDictationScene } from '@/hooks/useDictationScene';
 import { startPendingContextSync } from '@/lib/pendingDictationContext';
 import { useT } from '@/i18n';
+import { BinaryUpdateButton } from '@/updates/BinaryUpdateButton';
 
 const MOBILE = '@media (max-width: 720px)';
 const NARROW = '@media (max-width: 960px)';
@@ -206,6 +207,8 @@ const styles = stylex.create({
   feedback: {
     display: 'flex',
     flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
     paddingTop: 4,
   },
   mobileFeedback: {
@@ -280,6 +283,7 @@ export function Sidebar() {
         <p {...sx(styles.quote)}>{t('nav.quote')}</p>
         <div {...sx(styles.feedback)}>
           <FeedbackLaunchButtons compact />
+          <BinaryUpdateButton />
         </div>
       </div>
     </aside>

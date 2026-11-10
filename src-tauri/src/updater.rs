@@ -65,7 +65,7 @@ fn log_file() -> PathBuf {
 }
 
 /// The clone this binary was built from, if it is still there and updatable.
-fn source_root() -> Option<PathBuf> {
+pub fn source_root() -> Option<PathBuf> {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"))
         .parent()?
         .to_path_buf();

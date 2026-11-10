@@ -370,6 +370,18 @@ export const en: Messages = {
     doneTitle: 'Updated to v{version}',
     doneBody: 'Murmullo restarted on the new version.',
     doneToast: 'Murmullo updated to v{version}',
+    binary: {
+      available: 'Update available',
+      downloading: 'Downloading update… {percent}%',
+      downloadingUnknown: 'Downloading update…',
+      busy: 'Finish dictating to update',
+      dialogTitle: 'Murmullo v{version} is ready',
+      dialogBody:
+        "The update is downloaded and verified. Murmullo will close and reopen on the new version. If you'd rather wait, it will be installed when you quit the app.",
+      install: 'Install and restart',
+      later: 'Later',
+      installing: 'Installing…',
+    },
     groups: {
       Added: 'Added',
       Changed: 'Changed',
@@ -511,6 +523,13 @@ export const en: Messages = {
         "There are local changes in Murmullo's folder. Save or discard them before updating.",
       already_running: 'An update is already running.',
       spawn_failed: "Couldn't start the updater.",
+      not_binary_install:
+        'This copy of Murmullo was installed from the repository; update it with ./update.sh.',
+      download_failed:
+        "Couldn't download or verify the update. It was discarded.",
+      install_failed: "Couldn't install the update.",
+      nothing_to_install: 'No update has been downloaded.',
+      dictation_running: 'Finish dictating to update.',
     },
     generic: 'Could not complete the action. Check Runtimes or try again.',
     dictation: 'Dictation error',

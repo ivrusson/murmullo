@@ -92,3 +92,44 @@ export function overallPercent(status: UpdateStatus): number | null {
   if (status.percent === null || Number.isNaN(status.percent)) return null;
   return Math.max(0, Math.min(100, Math.round(status.percent)));
 }
+
+/** Mirror of `BinaryUpdateState` in src-tauri/src/binary_update.rs. */
+export interface BinaryUpdateState {
+  phase: 'idle' | 'checking' | 'downloading' | 'ready' | 'installing' | 'error';
+  version: string | null;
+  downloaded: number;
+  total: number | null;
+  error: string | null;
+  busy: boolean;
+}
+
+export type BinaryButton =
+  | { kind: 'hidden' }
+  | { kind: 'downloading'; percent: number | null }
+  | { kind: 'ready'; version: string; blocked: boolean }
+  | { kind: 'installing' };
+
+/** What the sidebar button shows for the packaged-app updater. */
+export function binaryButton(state: BinaryUpdateState | null): BinaryButton {
+  if (!state) return { kind: 'hidden' };
+  switch (state.phase) {
+    case 'downloading':
+      return {
+        kind: 'downloading',
+        percent:
+          state.total && state.total > 0
+            ? Math.min(100, Math.round((state.downloaded / state.total) * 100))
+            : null,
+      };
+    case 'ready':
+      return {
+        kind: 'ready',
+        version: state.version ?? '',
+        blocked: state.busy,
+      };
+    case 'installing':
+      return { kind: 'installing' };
+    default:
+      return { kind: 'hidden' };
+  }
+}
